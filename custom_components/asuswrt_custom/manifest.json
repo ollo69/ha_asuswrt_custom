@@ -1,10 +1,11 @@
 {
-  "domain": "asuswrt",
-  "name": "ASUSWRT",
+  "domain": "asuswrt_custom",
+  "name": "ASUSWRT Custom",
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/asuswrt",
   "requirements": ["aioasuswrt==1.4.0"],
-  "codeowners": ["@kennedyshead", "@ollo69"],
+  "codeowners": ["@ollo69"],
   "iot_class": "local_polling",
-  "loggers": ["aioasuswrt", "asyncssh"]
+  "loggers": ["aioasuswrt", "asyncssh"],
+  "version": "0.1.0"
 }

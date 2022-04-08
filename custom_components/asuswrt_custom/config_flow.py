@@ -22,6 +22,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import format_mac
 
+from .bridge import AsusWrtBridge
 from .const import (
     CONF_DNSMASQ,
     CONF_INTERFACE,
@@ -33,13 +34,12 @@ from .const import (
     DEFAULT_SSH_PORT,
     DEFAULT_TRACK_UNKNOWN,
     DOMAIN,
-    LABEL_MAC,
     MODE_AP,
     MODE_ROUTER,
+    PROTOCOL_HTTP,
     PROTOCOL_SSH,
     PROTOCOL_TELNET,
 )
-from .router import get_api, get_nvram_info
 
 RESULT_CONN_ERROR = "cannot_connect"
 RESULT_SUCCESS = "success"
@@ -88,8 +88,8 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     ): str,
                     vol.Optional(CONF_PASSWORD): str,
                     vol.Optional(CONF_SSH_KEY): str,
-                    vol.Required(CONF_PROTOCOL, default=PROTOCOL_SSH): vol.In(
-                        {PROTOCOL_SSH: "SSH", PROTOCOL_TELNET: "Telnet"}
+                    vol.Required(CONF_PROTOCOL, default=PROTOCOL_HTTP): vol.In(
+                        {PROTOCOL_HTTP: "HTTP", PROTOCOL_SSH: "SSH", PROTOCOL_TELNET: "Telnet"}
                     ),
                     vol.Required(CONF_PORT, default=DEFAULT_SSH_PORT): cv.port,
                     vol.Required(CONF_MODE, default=MODE_ROUTER): vol.In(
@@ -103,9 +103,9 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     async def _async_check_connection(self, user_input):
         """Attempt to connect the AsusWrt router."""
 
-        api = get_api(user_input)
+        api = AsusWrtBridge.get_bridge(self.hass, user_input)
         try:
-            await api.connection.async_connect()
+            await api.async_connect()
 
         except OSError:
             _LOGGER.error("Error connecting to the AsusWrt router at %s", self._host)
@@ -121,14 +121,11 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.error("Error connecting to the AsusWrt router at %s", self._host)
             return RESULT_CONN_ERROR, None
 
-        label_mac = await get_nvram_info(api, LABEL_MAC)
-        conf_protocol = user_input[CONF_PROTOCOL]
-        if conf_protocol == PROTOCOL_TELNET:
-            api.connection.disconnect()
-
         unique_id = None
-        if label_mac and "label_mac" in label_mac:
-            unique_id = format_mac(label_mac["label_mac"])
+        if label_mac := await api.get_label_mac():
+            unique_id = format_mac(label_mac)
+        await api.async_disconnect()
+
         return RESULT_SUCCESS, unique_id
 
     async def async_step_user(self, user_input=None):
@@ -208,6 +205,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Handle options flow."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
+        used_protocol = self.config_entry.data[CONF_PROTOCOL]
 
         data_schema = vol.Schema(
             {
@@ -223,29 +221,34 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_TRACK_UNKNOWN, DEFAULT_TRACK_UNKNOWN
                     ),
                 ): bool,
-                vol.Required(
-                    CONF_INTERFACE,
-                    default=self.config_entry.options.get(
-                        CONF_INTERFACE, DEFAULT_INTERFACE
-                    ),
-                ): str,
-                vol.Required(
-                    CONF_DNSMASQ,
-                    default=self.config_entry.options.get(
-                        CONF_DNSMASQ, DEFAULT_DNSMASQ
-                    ),
-                ): str,
             }
         )
 
-        if self.config_entry.data[CONF_MODE] == MODE_AP:
+        if used_protocol != PROTOCOL_HTTP:
             data_schema = data_schema.extend(
                 {
-                    vol.Optional(
-                        CONF_REQUIRE_IP,
-                        default=self.config_entry.options.get(CONF_REQUIRE_IP, True),
-                    ): bool,
+                    vol.Required(
+                        CONF_INTERFACE,
+                        default=self.config_entry.options.get(
+                            CONF_INTERFACE, DEFAULT_INTERFACE
+                        ),
+                    ): str,
+                    vol.Required(
+                        CONF_DNSMASQ,
+                        default=self.config_entry.options.get(
+                            CONF_DNSMASQ, DEFAULT_DNSMASQ
+                        ),
+                    ): str,
                 }
             )
+            if self.config_entry.data[CONF_MODE] == MODE_AP:
+                data_schema = data_schema.extend(
+                    {
+                        vol.Optional(
+                            CONF_REQUIRE_IP,
+                            default=self.config_entry.options.get(CONF_REQUIRE_IP, True),
+                        ): bool,
+                    }
+                )
 
         return self.async_show_form(step_id="init", data_schema=data_schema)

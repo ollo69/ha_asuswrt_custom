@@ -1,12 +1,10 @@
 """Represent the AsusWrt router."""
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 import logging
-from typing import Any
-
-from aioasuswrt.asuswrt import AsusWrt
+from typing import Any, TypeVar
 
 from homeassistant.components.device_tracker.const import (
     CONF_CONSIDER_HOME,
@@ -14,14 +12,7 @@ from homeassistant.components.device_tracker.const import (
     DOMAIN as TRACKER_DOMAIN,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_HOST,
-    CONF_MODE,
-    CONF_PASSWORD,
-    CONF_PORT,
-    CONF_PROTOCOL,
-    CONF_USERNAME,
-)
+from homeassistant.const import CONF_HOST, CONF_PROTOCOL
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er
@@ -29,25 +20,20 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .bridge import AsusWrtBridge
 from .const import (
     CONF_DNSMASQ,
     CONF_INTERFACE,
     CONF_REQUIRE_IP,
-    CONF_SSH_KEY,
     CONF_TRACK_UNKNOWN,
     DEFAULT_DNSMASQ,
     DEFAULT_INTERFACE,
     DEFAULT_TRACK_UNKNOWN,
     DOMAIN,
-    PROTOCOL_TELNET,
-    SENSORS_BYTES,
     SENSORS_CONNECTED_DEVICE,
-    SENSORS_LOAD_AVG,
-    SENSORS_RATES,
-    SENSORS_TEMPERATURES,
 )
 
 CONF_REQ_RELOAD = [CONF_DNSMASQ, CONF_INTERFACE, CONF_REQUIRE_IP]
@@ -58,29 +44,17 @@ KEY_SENSORS = "sensors"
 
 SCAN_INTERVAL = timedelta(seconds=30)
 
-SENSORS_TYPE_BYTES = "sensors_bytes"
 SENSORS_TYPE_COUNT = "sensors_count"
-SENSORS_TYPE_LOAD_AVG = "sensors_load_avg"
-SENSORS_TYPE_RATES = "sensors_rates"
-SENSORS_TYPE_TEMPERATURES = "sensors_temperatures"
+
+_T = TypeVar("_T")
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _get_dict(keys: list, values: list) -> dict[str, Any]:
-    """Create a dict from a list of keys and values."""
-    ret_dict: dict[str, Any] = dict.fromkeys(keys)
-
-    for index, key in enumerate(ret_dict):
-        ret_dict[key] = values[index]
-
-    return ret_dict
 
 
 class AsusWrtSensorDataHandler:
     """Data handler for AsusWrt sensor."""
 
-    def __init__(self, hass, api):
+    def __init__(self, hass: HomeAssistant, api: AsusWrtBridge) -> None:
         """Initialize a AsusWrt sensor data handler."""
         self._hass = hass
         self._api = api
@@ -90,42 +64,6 @@ class AsusWrtSensorDataHandler:
         """Return number of connected devices."""
         return {SENSORS_CONNECTED_DEVICE[0]: self._connected_devices}
 
-    async def _get_bytes(self):
-        """Fetch byte information from the router."""
-        try:
-            datas = await self._api.async_get_bytes_total()
-        except (OSError, ValueError) as exc:
-            raise UpdateFailed(exc) from exc
-
-        return _get_dict(SENSORS_BYTES, datas)
-
-    async def _get_rates(self):
-        """Fetch rates information from the router."""
-        try:
-            rates = await self._api.async_get_current_transfer_rates()
-        except (OSError, ValueError) as exc:
-            raise UpdateFailed(exc) from exc
-
-        return _get_dict(SENSORS_RATES, rates)
-
-    async def _get_load_avg(self):
-        """Fetch load average information from the router."""
-        try:
-            avg = await self._api.async_get_loadavg()
-        except (OSError, ValueError) as exc:
-            raise UpdateFailed(exc) from exc
-
-        return _get_dict(SENSORS_LOAD_AVG, avg)
-
-    async def _get_temperatures(self):
-        """Fetch temperatures information from the router."""
-        try:
-            temperatures = await self._api.async_get_temperature()
-        except (OSError, ValueError) as exc:
-            raise UpdateFailed(exc) from exc
-
-        return temperatures
-
     def update_device_count(self, conn_devices: int):
         """Update connected devices attribute."""
         if self._connected_devices == conn_devices:
@@ -133,18 +71,18 @@ class AsusWrtSensorDataHandler:
         self._connected_devices = conn_devices
         return True
 
-    async def get_coordinator(self, sensor_type: str, should_poll=True):
+    async def get_coordinator(
+        self,
+        sensor_type: str,
+        update_method: Callable[[], Awaitable[_T]] | None = None,
+    ):
         """Get the coordinator for a specific sensor type."""
+        should_poll = True
         if sensor_type == SENSORS_TYPE_COUNT:
+            should_poll = False
             method = self._get_connected_devices
-        elif sensor_type == SENSORS_TYPE_BYTES:
-            method = self._get_bytes
-        elif sensor_type == SENSORS_TYPE_LOAD_AVG:
-            method = self._get_load_avg
-        elif sensor_type == SENSORS_TYPE_RATES:
-            method = self._get_rates
-        elif sensor_type == SENSORS_TYPE_TEMPERATURES:
-            method = self._get_temperatures
+        elif update_method is not None:
+            method = update_method
         else:
             raise RuntimeError(f"Invalid sensor type: {sensor_type}")
 
@@ -222,7 +160,7 @@ class AsusWrtRouter:
         self.hass = hass
         self._entry = entry
 
-        self._api: AsusWrt = None
+        self._api: AsusWrtBridge | None = None
         self._protocol = entry.data[CONF_PROTOCOL]
         self._host = entry.data[CONF_HOST]
         self._model = "Asus Router"
@@ -246,10 +184,12 @@ class AsusWrtRouter:
 
     async def setup(self) -> None:
         """Set up a AsusWrt router."""
-        self._api = get_api(dict(self._entry.data), self._options)
+        self._api = AsusWrtBridge.get_bridge(
+            self.hass, dict(self._entry.data), self._options
+        )
 
         try:
-            await self._api.connection.async_connect()
+            await self._api.async_connect()
         except OSError as exp:
             raise ConfigEntryNotReady from exp
 
@@ -257,12 +197,9 @@ class AsusWrtRouter:
             raise ConfigEntryNotReady
 
         # System
-        model = await get_nvram_info(self._api, "MODEL")
-        if model and "model" in model:
-            self._model = model["model"]
-        firmware = await get_nvram_info(self._api, "FIRMWARE")
-        if firmware and "firmver" in firmware and "buildno" in firmware:
-            self._sw_v = f"{firmware['firmver']} (build {firmware['buildno']})"
+        if model := await self._api.get_model():
+            self._model = model
+        self._sw_v = await self._api.get_firmware()
 
         # Load tracked entities from registry
         entity_reg = er.async_get(self.hass)
@@ -358,21 +295,14 @@ class AsusWrtRouter:
         self._sensors_data_handler = AsusWrtSensorDataHandler(self.hass, self._api)
         self._sensors_data_handler.update_device_count(self._connected_devices)
 
-        sensors_types = {
-            SENSORS_TYPE_BYTES: SENSORS_BYTES,
-            SENSORS_TYPE_COUNT: SENSORS_CONNECTED_DEVICE,
-            SENSORS_TYPE_LOAD_AVG: SENSORS_LOAD_AVG,
-            SENSORS_TYPE_RATES: SENSORS_RATES,
-        }
-        sensors_types[
-            SENSORS_TYPE_TEMPERATURES
-        ] = await self._get_available_temperature_sensors()
+        sensors_types = await self._api.async_get_available_sensors()
+        sensors_types[SENSORS_TYPE_COUNT] = {"sensors": SENSORS_CONNECTED_DEVICE}
 
-        for sensor_type, sensor_names in sensors_types.items():
-            if not sensor_names:
+        for sensor_type, sensor_def in sensors_types.items():
+            if not (sensor_names := sensor_def.get("sensors")):
                 continue
             coordinator = await self._sensors_data_handler.get_coordinator(
-                sensor_type, sensor_type != SENSORS_TYPE_COUNT
+                sensor_type, update_method=sensor_def.get("method")
             )
             self._sensors_coordinator[sensor_type] = {
                 KEY_COORDINATOR: coordinator,
@@ -389,27 +319,10 @@ class AsusWrtRouter:
             if self._sensors_data_handler.update_device_count(self._connected_devices):
                 await coordinator.async_refresh()
 
-    async def _get_available_temperature_sensors(self):
-        """Check which temperature information is available on the router."""
-        try:
-            availability = await self._api.async_find_temperature_commands()
-            available_sensors = [
-                SENSORS_TEMPERATURES[i] for i in range(3) if availability[i]
-            ]
-        except Exception as exc:  # pylint: disable=broad-except
-            _LOGGER.debug(
-                "Failed checking temperature sensor availability for ASUS router %s. Exception: %s",
-                self._host,
-                exc,
-            )
-            return []
-
-        return available_sensors
-
     async def close(self) -> None:
         """Close the connection."""
-        if self._api is not None and self._protocol == PROTOCOL_TELNET:
-            self._api.connection.disconnect()
+        if self._api is not None:
+            await self._api.async_disconnect()
         self._api = None
 
         for func in self._on_close:
@@ -482,35 +395,6 @@ class AsusWrtRouter:
         return self._sensors_coordinator
 
     @property
-    def api(self) -> AsusWrt:
+    def api(self) -> AsusWrtBridge:
         """Return router API."""
         return self._api
-
-
-async def get_nvram_info(api: AsusWrt, info_type: str) -> dict[str, Any]:
-    """Get AsusWrt router info from nvram."""
-    info = {}
-    try:
-        info = await api.async_get_nvram(info_type)
-    except OSError as exc:
-        _LOGGER.warning("Error calling method async_get_nvram(%s): %s", info_type, exc)
-
-    return info
-
-
-def get_api(conf: dict, options: dict | None = None) -> AsusWrt:
-    """Get the AsusWrt API."""
-    opt = options or {}
-
-    return AsusWrt(
-        conf[CONF_HOST],
-        conf[CONF_PORT],
-        conf[CONF_PROTOCOL] == PROTOCOL_TELNET,
-        conf[CONF_USERNAME],
-        conf.get(CONF_PASSWORD, ""),
-        conf.get(CONF_SSH_KEY, ""),
-        conf[CONF_MODE],
-        opt.get(CONF_REQUIRE_IP, True),
-        interface=opt.get(CONF_INTERFACE, DEFAULT_INTERFACE),
-        dnsmasq=opt.get(CONF_DNSMASQ, DEFAULT_DNSMASQ),
-    )
