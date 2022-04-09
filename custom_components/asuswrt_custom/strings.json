@@ -11,7 +11,7 @@
           "password": "[%key:common::config_flow::data::password%]",
           "ssh_key": "Path to your SSH key file (instead of password)",
           "protocol": "Communication protocol to use",
-          "port": "[%key:common::config_flow::data::port%]",
+          "port": "[%key:common::config_flow::data::port%] (Leave 0 for protocol default)",
           "mode": "[%key:common::config_flow::data::mode%]"
         }
       }
@@ -20,6 +20,7 @@
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "invalid_host": "[%key:common::config_flow::error::invalid_host%]",
       "pwd_and_ssh": "Only provide password or SSH key file",
+      "pwd_http_request": "Password required for http(s) protocols",
       "pwd_or_ssh": "Please provide password or SSH key file",
       "ssh_not_file": "SSH key file not found",
       "unknown": "[%key:common::config_flow::error::unknown%]"

@@ -19,9 +19,9 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import callback
-from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import format_mac
 
+from .api.AsusWrt import AsusWrtConnectionError, AsusWrtLoginError
 from .bridge import AsusWrtBridge
 from .const import (
     CONF_DNSMASQ,
@@ -31,15 +31,22 @@ from .const import (
     CONF_TRACK_UNKNOWN,
     DEFAULT_DNSMASQ,
     DEFAULT_INTERFACE,
-    DEFAULT_SSH_PORT,
     DEFAULT_TRACK_UNKNOWN,
     DOMAIN,
     MODE_AP,
     MODE_ROUTER,
     PROTOCOL_HTTP,
+    PROTOCOL_HTTPS,
     PROTOCOL_SSH,
     PROTOCOL_TELNET,
 )
+
+ALLOWED_PROTOCOL = {
+    PROTOCOL_HTTP: "HTTP",
+    PROTOCOL_HTTPS: "HTTPS",
+    PROTOCOL_SSH: "SSH",
+    PROTOCOL_TELNET: "Telnet"
+}
 
 RESULT_CONN_ERROR = "cannot_connect"
 RESULT_SUCCESS = "success"
@@ -89,9 +96,11 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_PASSWORD): str,
                     vol.Optional(CONF_SSH_KEY): str,
                     vol.Required(CONF_PROTOCOL, default=PROTOCOL_HTTP): vol.In(
-                        {PROTOCOL_HTTP: "HTTP", PROTOCOL_SSH: "SSH", PROTOCOL_TELNET: "Telnet"}
+                        ALLOWED_PROTOCOL
                     ),
-                    vol.Required(CONF_PORT, default=DEFAULT_SSH_PORT): cv.port,
+                    vol.Required(CONF_PORT, default=0): vol.All(
+                        vol.Coerce(int), vol.Range(min=0, max=65535)
+                    ),
                     vol.Required(CONF_MODE, default=MODE_ROUTER): vol.In(
                         {MODE_ROUTER: "Router", MODE_AP: "Access Point"}
                     ),
@@ -107,7 +116,7 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             await api.async_connect()
 
-        except OSError:
+        except (AsusWrtConnectionError, AsusWrtLoginError, OSError):
             _LOGGER.error("Error connecting to the AsusWrt router at %s", self._host)
             return RESULT_CONN_ERROR, None
 
@@ -145,11 +154,17 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         errors = {}
         self._host = user_input[CONF_HOST]
+        protocol = user_input[CONF_PROTOCOL]
+        if protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
+            user_input.pop(CONF_MODE)
+
         pwd = user_input.get(CONF_PASSWORD)
         ssh = user_input.get(CONF_SSH_KEY)
 
         if not (pwd or ssh):
             errors["base"] = "pwd_or_ssh"
+        elif not pwd and protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
+            errors["base"] = "pwd_http_request"
         elif ssh:
             if pwd:
                 errors["base"] = "pwd_and_ssh"
@@ -169,7 +184,7 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 if unique_id:
                     await self.async_set_unique_id(unique_id)
                     self._abort_if_unique_id_configured()
-                # we allow configure a single instance without unique id
+                # we allow to configure a single instance without unique id
                 elif self._async_current_entries():
                     return self.async_abort(reason="invalid_unique_id")
                 else:
@@ -224,7 +239,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             }
         )
 
-        if used_protocol != PROTOCOL_HTTP:
+        if used_protocol in [PROTOCOL_SSH, PROTOCOL_TELNET]:
             data_schema = data_schema.extend(
                 {
                     vol.Required(

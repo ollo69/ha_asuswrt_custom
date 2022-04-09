@@ -18,7 +18,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from .api.AsusWrt import AsusWrtHttp, AsusWrtConnectionError, AsusWrtNotConnectedError
+from .api.AsusWrt import AsusWrtHttp, AsusWrtConnectionError, AsusWrtLoginError
 
 from .const import (
     CONF_DNSMASQ,
@@ -28,6 +28,7 @@ from .const import (
     DEFAULT_DNSMASQ,
     DEFAULT_INTERFACE,
     PROTOCOL_HTTP,
+    PROTOCOL_HTTPS,
     PROTOCOL_TELNET,
     SENSORS_BYTES,
     SENSORS_LOAD_AVG,
@@ -65,7 +66,7 @@ class AsusWrtBridge(ABC):
     ) -> AsusWrtBridge:
         """Get Bridge instance."""
         protocol = conf[CONF_PROTOCOL]
-        if protocol == PROTOCOL_HTTP:
+        if protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
             session = hass.helpers.aiohttp_client.async_get_clientsession()
             return AsusWrtHttpBridge(conf, session)
         return AsusWrtLegacyBridge(conf, options)
@@ -127,10 +128,11 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
     def _get_api(conf: dict, options: dict | None = None) -> AsusWrtLegacy:
         """Get the AsusWrtLegacy API."""
         opt = options or {}
+        port = conf[CONF_PORT]
 
         return AsusWrtLegacy(
             conf[CONF_HOST],
-            conf[CONF_PORT],
+            port if port > 0 else None,
             conf[CONF_PROTOCOL] == PROTOCOL_TELNET,
             conf[CONF_USERNAME],
             conf.get(CONF_PASSWORD, ""),
@@ -280,11 +282,14 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     @staticmethod
     def _get_api(conf: dict, session: ClientSession) -> AsusWrtHttp:
         """Get the AsusWrtHttp API."""
+        use_https = conf[CONF_PROTOCOL] == PROTOCOL_HTTPS
         return AsusWrtHttp(
             conf[CONF_HOST],
             conf[CONF_USERNAME],
             conf.get(CONF_PASSWORD, ""),
-            session=session
+            use_https=use_https,
+            port=conf[CONF_PORT],
+            session=session,
         )
 
     @property
@@ -309,7 +314,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         info = {}
         try:
             info = await self._api.async_get_settings(info_type)
-        except (AsusWrtConnectionError, AsusWrtNotConnectedError) as exc:
+        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
             _LOGGER.warning("Error calling method async_get_settings(%s): %s", info_type, exc)
 
         return info
@@ -357,7 +362,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Fetch byte information from the router."""
         try:
             datas = await self._api.async_get_traffic_bytes()
-        except (AsusWrtConnectionError, AsusWrtNotConnectedError) as exc:
+        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
             raise UpdateFailed(exc) from exc
 
         return _get_dict(SENSORS_BYTES, list(datas.values()))
@@ -366,7 +371,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Fetch rates information from the router."""
         try:
             rates = await self._api.async_get_traffic_rates()
-        except (AsusWrtConnectionError, AsusWrtNotConnectedError) as exc:
+        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
             raise UpdateFailed(exc) from exc
 
         return _get_dict(SENSORS_RATES, list(rates.values()))
