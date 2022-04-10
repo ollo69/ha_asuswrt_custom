@@ -1,6 +1,5 @@
 """Config flow to configure the AsusWrt integration."""
 import logging
-from pyasuswrt.asuswrt import AsusWrtConnectionError, AsusWrtLoginError
 import os
 import socket
 
@@ -20,6 +19,8 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import callback
+from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import format_mac
 
 from .bridge import AsusWrtBridge
@@ -85,27 +86,28 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             user_input = {}
 
+        schema = {
+            vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
+            vol.Required(CONF_USERNAME, default=user_input.get(CONF_USERNAME, "")): str,
+            vol.Optional(CONF_PASSWORD)
+            if self.show_advanced_options
+            else vol.Required(CONF_PASSWORD): str,
+            vol.Required(CONF_PROTOCOL, default=PROTOCOL_HTTP): vol.In(
+                ALLOWED_PROTOCOL
+            ),
+        }
+
+        if self.show_advanced_options:
+            schema[vol.Optional(CONF_PORT)] = cv.port
+            schema[vol.Optional(CONF_SSH_KEY)] = str
+
+        schema[vol.Required(CONF_MODE, default=MODE_ROUTER)] = vol.In(
+            {MODE_ROUTER: "Router", MODE_AP: "Access Point"}
+        )
+
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
-                    vol.Required(
-                        CONF_USERNAME, default=user_input.get(CONF_USERNAME, "")
-                    ): str,
-                    vol.Optional(CONF_PASSWORD): str,
-                    vol.Optional(CONF_SSH_KEY): str,
-                    vol.Required(CONF_PROTOCOL, default=PROTOCOL_HTTP): vol.In(
-                        ALLOWED_PROTOCOL
-                    ),
-                    vol.Required(CONF_PORT, default=0): vol.All(
-                        vol.Coerce(int), vol.Range(min=0, max=65535)
-                    ),
-                    vol.Required(CONF_MODE, default=MODE_ROUTER): vol.In(
-                        {MODE_ROUTER: "Router", MODE_AP: "Access Point"}
-                    ),
-                }
-            ),
+            data_schema=vol.Schema(schema),
             errors=errors or {},
         )
 
@@ -116,7 +118,7 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             await api.async_connect()
 
-        except (AsusWrtConnectionError, AsusWrtLoginError, OSError):
+        except ConfigEntryNotReady:
             _LOGGER.error("Error connecting to the AsusWrt router at %s", self._host)
             return RESULT_CONN_ERROR, None
 
@@ -154,6 +156,7 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         errors = {}
         self._host = user_input[CONF_HOST]
+
         protocol = user_input[CONF_PROTOCOL]
         if protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
             user_input.pop(CONF_MODE)

@@ -11,8 +11,8 @@
           "password": "[%key:common::config_flow::data::password%]",
           "ssh_key": "Path to your SSH key file (instead of password)",
           "protocol": "Communication protocol to use",
-          "port": "[%key:common::config_flow::data::port%] (Leave 0 for protocol default)",
-          "mode": "[%key:common::config_flow::data::mode%]"
+          "port": "[%key:common::config_flow::data::port%] (Leave empty for protocol default)",
+          "mode": "[%key:common::config_flow::data::mode%] (Only for SSH and Telnet Protocol)"
         }
       }
     },

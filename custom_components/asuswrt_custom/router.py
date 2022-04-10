@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 import logging
-from pyasuswrt.asuswrt import AsusWrtConnectionError, AsusWrtLoginError
 from typing import Any, TypeVar
 
 from homeassistant.components.device_tracker.const import (
@@ -21,7 +20,7 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .bridge import AsusWrtBridge
@@ -189,11 +188,7 @@ class AsusWrtRouter:
             self.hass, dict(self._entry.data), self._options
         )
 
-        try:
-            await self._api.async_connect()
-        except (AsusWrtConnectionError, AsusWrtLoginError, OSError) as exp:
-            raise ConfigEntryNotReady from exp
-
+        await self._api.async_connect()
         if not self._api.is_connected:
             raise ConfigEntryNotReady
 
@@ -250,7 +245,7 @@ class AsusWrtRouter:
         _LOGGER.debug("Checking devices for ASUS router %s", self._host)
         try:
             api_devices = await self._api.async_get_connected_devices()
-        except (AsusWrtConnectionError, AsusWrtLoginError, OSError) as exc:
+        except UpdateFailed as exc:
             if not self._connect_error:
                 self._connect_error = True
                 _LOGGER.error(

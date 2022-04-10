@@ -17,6 +17,7 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
@@ -127,11 +128,10 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
     def _get_api(conf: dict, options: dict | None = None) -> AsusWrtLegacy:
         """Get the AsusWrtLegacy API."""
         opt = options or {}
-        port = conf[CONF_PORT]
 
         return AsusWrtLegacy(
             conf[CONF_HOST],
-            port if port > 0 else None,
+            conf.get(CONF_PORT),
             conf[CONF_PROTOCOL] == PROTOCOL_TELNET,
             conf[CONF_USERNAME],
             conf.get(CONF_PASSWORD, ""),
@@ -149,7 +149,10 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
 
     async def async_connect(self) -> None:
         """Connect to the device."""
-        await self._api.connection.async_connect()
+        try:
+            await self._api.connection.async_connect()
+        except OSError as exc:
+            raise ConfigEntryNotReady from exc
 
     async def async_disconnect(self) -> None:
         """Disconnect to the device."""
@@ -158,7 +161,10 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
 
     async def async_get_connected_devices(self) -> dict[str, Any]:
         """Get list of connected devices."""
-        return await self._api.async_get_connected_devices()
+        try:
+            return await self._api.async_get_connected_devices()
+        except OSError as exc:
+            raise UpdateFailed(exc) from exc
 
     async def _get_nvram_info(self, info_type: str) -> dict[str, Any]:
         """Get AsusWrt router info from nvram."""
@@ -281,13 +287,12 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     @staticmethod
     def _get_api(conf: dict, session: ClientSession) -> AsusWrtHttp:
         """Get the AsusWrtHttp API."""
-        use_https = conf[CONF_PROTOCOL] == PROTOCOL_HTTPS
         return AsusWrtHttp(
             conf[CONF_HOST],
             conf[CONF_USERNAME],
             conf.get(CONF_PASSWORD, ""),
-            use_https=use_https,
-            port=conf[CONF_PORT],
+            use_https=conf[CONF_PROTOCOL] == PROTOCOL_HTTPS,
+            port=conf.get(CONF_PORT),
             session=session,
         )
 
@@ -298,7 +303,10 @@ class AsusWrtHttpBridge(AsusWrtBridge):
 
     async def async_connect(self) -> None:
         """Connect to the device."""
-        await self._api.async_connect()
+        try:
+            await self._api.async_connect()
+        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
+            raise ConfigEntryNotReady from exc
 
     async def async_disconnect(self) -> None:
         """Disconnect to the device."""
@@ -306,7 +314,10 @@ class AsusWrtHttpBridge(AsusWrtBridge):
 
     async def async_get_connected_devices(self) -> dict[str, Any]:
         """Get list of connected devices."""
-        return await self._api.async_get_connected_devices()
+        try:
+            return await self._api.async_get_connected_devices()
+        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
+            raise UpdateFailed(exc) from exc
 
     async def _async_get_settings(self, info_type: str) -> dict[str, Any]:
         """Get AsusWrt router info from nvram."""
@@ -361,7 +372,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Fetch byte information from the router."""
         try:
             datas = await self._api.async_get_traffic_bytes()
-        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
+        except (AsusWrtConnectionError, AsusWrtLoginError, ValueError) as exc:
             raise UpdateFailed(exc) from exc
 
         return _get_dict(SENSORS_BYTES, list(datas.values()))
@@ -370,7 +381,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Fetch rates information from the router."""
         try:
             rates = await self._api.async_get_traffic_rates()
-        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
+        except (AsusWrtConnectionError, AsusWrtLoginError, ValueError) as exc:
             raise UpdateFailed(exc) from exc
 
         return _get_dict(SENSORS_RATES, list(rates.values()))

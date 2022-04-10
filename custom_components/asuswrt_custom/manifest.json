@@ -3,7 +3,7 @@
   "name": "ASUSWRT Custom",
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/asuswrt",
-  "requirements": ["aioasuswrt==1.4.0", "pyasuswrt==0.1.0"],
+  "requirements": ["aioasuswrt==1.4.0", "pyasuswrt==0.1.1"],
   "codeowners": ["@ollo69"],
   "iot_class": "local_polling",
   "loggers": ["aioasuswrt", "asyncssh", "pyasuswrt"],
