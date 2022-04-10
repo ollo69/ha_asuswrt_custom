@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 import logging
+from pyasuswrt.asuswrt import AsusWrtConnectionError, AsusWrtLoginError
 from typing import Any, TypeVar
 
 from homeassistant.components.device_tracker.const import (
@@ -23,7 +24,6 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .api.AsusWrt import AsusWrtConnectionError, AsusWrtLoginError
 from .bridge import AsusWrtBridge
 from .const import (
     CONF_DNSMASQ,

@@ -1,5 +1,6 @@
 """Config flow to configure the AsusWrt integration."""
 import logging
+from pyasuswrt.asuswrt import AsusWrtConnectionError, AsusWrtLoginError
 import os
 import socket
 
@@ -21,7 +22,6 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import format_mac
 
-from .api.AsusWrt import AsusWrtConnectionError, AsusWrtLoginError
 from .bridge import AsusWrtBridge
 from .const import (
     CONF_DNSMASQ,

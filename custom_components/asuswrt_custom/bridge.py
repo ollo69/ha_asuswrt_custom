@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from aioasuswrt.asuswrt import AsusWrt as AsusWrtLegacy
 from aiohttp import ClientSession
 import logging
+from pyasuswrt.asuswrt import AsusWrtHttp, AsusWrtConnectionError, AsusWrtLoginError
 from typing import Any
 
 from homeassistant.const import (
@@ -17,8 +18,6 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
-
-from .api.AsusWrt import AsusWrtHttp, AsusWrtConnectionError, AsusWrtLoginError
 
 from .const import (
     CONF_DNSMASQ,
