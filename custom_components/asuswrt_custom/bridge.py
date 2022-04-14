@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from aioasuswrt.asuswrt import AsusWrt as AsusWrtLegacy
 from aiohttp import ClientSession
 import logging
-from pyasuswrt.asuswrt import AsusWrtHttp, AsusWrtConnectionError, AsusWrtLoginError
+from pyasuswrt import AsusWrtHttp, AsusWrtError
 from typing import Any
 
 from homeassistant.const import (
@@ -305,7 +305,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Connect to the device."""
         try:
             await self._api.async_connect()
-        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
+        except AsusWrtError as exc:
             raise ConfigEntryNotReady from exc
 
     async def async_disconnect(self) -> None:
@@ -316,7 +316,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Get list of connected devices."""
         try:
             return await self._api.async_get_connected_devices()
-        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
+        except AsusWrtError as exc:
             raise UpdateFailed(exc) from exc
 
     async def _async_get_settings(self, info_type: str) -> dict[str, Any]:
@@ -324,7 +324,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         info = {}
         try:
             info = await self._api.async_get_settings(info_type)
-        except (AsusWrtConnectionError, AsusWrtLoginError) as exc:
+        except AsusWrtError as exc:
             _LOGGER.warning("Error calling method async_get_settings(%s): %s", info_type, exc)
 
         return info
@@ -372,7 +372,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Fetch byte information from the router."""
         try:
             datas = await self._api.async_get_traffic_bytes()
-        except (AsusWrtConnectionError, AsusWrtLoginError, ValueError) as exc:
+        except AsusWrtError as exc:
             raise UpdateFailed(exc) from exc
 
         return _get_dict(SENSORS_BYTES, list(datas.values()))
@@ -381,7 +381,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Fetch rates information from the router."""
         try:
             rates = await self._api.async_get_traffic_rates()
-        except (AsusWrtConnectionError, AsusWrtLoginError, ValueError) as exc:
+        except AsusWrtError as exc:
             raise UpdateFailed(exc) from exc
 
         return _get_dict(SENSORS_RATES, list(rates.values()))
