@@ -60,11 +60,11 @@ class AsusWrtSensorDataHandler:
         self._api = api
         self._connected_devices = 0
 
-    async def _get_connected_devices(self):
+    async def _get_connected_devices(self) -> dict[str, int]:
         """Return number of connected devices."""
         return {SENSORS_CONNECTED_DEVICE[0]: self._connected_devices}
 
-    def update_device_count(self, conn_devices: int):
+    def update_device_count(self, conn_devices: int) -> bool:
         """Update connected devices attribute."""
         if self._connected_devices == conn_devices:
             return False
@@ -75,7 +75,7 @@ class AsusWrtSensorDataHandler:
         self,
         sensor_type: str,
         update_method: Callable[[], Awaitable[_T]] | None = None,
-    ):
+    ) -> DataUpdateCoordinator:
         """Get the coordinator for a specific sensor type."""
         should_poll = True
         if sensor_type == SENSORS_TYPE_COUNT:

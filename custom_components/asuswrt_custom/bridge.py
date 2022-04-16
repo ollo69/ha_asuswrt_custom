@@ -233,7 +233,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
         }
         return sensors_types
 
-    async def _get_available_temperature_sensors(self):
+    async def _get_available_temperature_sensors(self) -> list[str]:
         """Check which temperature information is available on the router."""
         try:
             availability = await self._api.async_find_temperature_commands()
@@ -248,7 +248,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
             return []
         return available_sensors
 
-    async def _get_bytes(self):
+    async def _get_bytes(self) -> dict[str, Any]:
         """Fetch byte information from the router."""
         try:
             datas = await self._api.async_get_bytes_total()
@@ -257,7 +257,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
 
         return _get_dict(SENSORS_BYTES, datas)
 
-    async def _get_rates(self):
+    async def _get_rates(self) -> dict[str, Any]:
         """Fetch rates information from the router."""
         try:
             rates = await self._api.async_get_current_transfer_rates()
@@ -266,7 +266,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
 
         return _get_dict(SENSORS_RATES, rates)
 
-    async def _get_load_avg(self):
+    async def _get_load_avg(self) -> dict[str, Any]:
         """Fetch load average information from the router."""
         try:
             avg = await self._api.async_get_loadavg()
@@ -275,7 +275,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
 
         return _get_dict(SENSORS_LOAD_AVG, avg)
 
-    async def _get_temperatures(self):
+    async def _get_temperatures(self) -> dict[str, Any]:
         """Fetch temperatures information from the router."""
         try:
             temperatures = await self._api.async_get_temperature()
@@ -381,7 +381,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         }
         return sensors_types
 
-    async def _get_bytes(self):
+    async def _get_bytes(self) -> dict[str, Any]:
         """Fetch byte information from the router."""
         try:
             datas = await self._api.async_get_traffic_bytes()
@@ -390,7 +390,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
 
         return _get_dict(SENSORS_BYTES, list(datas.values()))
 
-    async def _get_rates(self):
+    async def _get_rates(self) -> dict[str, Any]:
         """Fetch rates information from the router."""
         try:
             rates = await self._api.async_get_traffic_rates()
