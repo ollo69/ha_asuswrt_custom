@@ -4,6 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from aioasuswrt.asuswrt import AsusWrt as AsusWrtLegacy
 from aiohttp import ClientSession
+from collections import namedtuple
 import logging
 from pyasuswrt import AsusWrtHttp, AsusWrtError
 from typing import Any
@@ -18,6 +19,8 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
@@ -41,6 +44,8 @@ SENSORS_TYPE_COUNT = "sensors_count"
 SENSORS_TYPE_LOAD_AVG = "sensors_load_avg"
 SENSORS_TYPE_RATES = "sensors_rates"
 SENSORS_TYPE_TEMPERATURES = "sensors_temperatures"
+
+BridgeDevice = namedtuple("BridgeDevice", ["ip", "name", "connected_to"])
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,7 +72,7 @@ class AsusWrtBridge(ABC):
         """Get Bridge instance."""
         protocol = conf[CONF_PROTOCOL]
         if protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
-            session = hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(hass)
             return AsusWrtHttpBridge(conf, session)
         return AsusWrtLegacyBridge(conf, options)
 
@@ -93,7 +98,7 @@ class AsusWrtBridge(ABC):
         """Disconnect to the device."""
 
     @abstractmethod
-    async def async_get_connected_devices(self) -> dict[str, Any]:
+    async def async_get_connected_devices(self) -> dict[str, BridgeDevice]:
         """Get list of connected devices."""
 
     async def get_firmware(self) -> str | None:
@@ -159,12 +164,16 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
         if self._api is not None and self._protocol == PROTOCOL_TELNET:
             self._api.connection.disconnect()
 
-    async def async_get_connected_devices(self) -> dict[str, Any]:
+    async def async_get_connected_devices(self) -> dict[str, BridgeDevice]:
         """Get list of connected devices."""
         try:
-            return await self._api.async_get_connected_devices()
+            api_devices = await self._api.async_get_connected_devices()
         except OSError as exc:
             raise UpdateFailed(exc) from exc
+        return {
+            format_mac(mac): BridgeDevice(dev.ip, dev.name, None)
+            for mac, dev in api_devices.items()
+        }
 
     async def _get_nvram_info(self, info_type: str) -> dict[str, Any]:
         """Get AsusWrt router info from nvram."""
@@ -193,7 +202,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
             self._label_mac = ""
             label_mac = await self._get_nvram_info("LABEL_MAC")
             if label_mac and "label_mac" in label_mac:
-                self._label_mac = label_mac["label_mac"]
+                self._label_mac = format_mac(label_mac["label_mac"])
         return self._label_mac or None
 
     async def get_model(self) -> str | None:
@@ -312,12 +321,16 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Disconnect to the device."""
         await self._api.async_disconnect()
 
-    async def async_get_connected_devices(self) -> dict[str, Any]:
+    async def async_get_connected_devices(self) -> dict[str, BridgeDevice]:
         """Get list of connected devices."""
         try:
-            return await self._api.async_get_connected_devices()
+            api_devices = await self._api.async_get_connected_devices()
         except AsusWrtError as exc:
             raise UpdateFailed(exc) from exc
+        return {
+            format_mac(mac): BridgeDevice(dev.ip, dev.name, dev.node)
+            for mac, dev in api_devices.items()
+        }
 
     async def _async_get_settings(self, info_type: str) -> dict[str, Any]:
         """Get AsusWrt router info from nvram."""
@@ -341,10 +354,10 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     async def get_label_mac(self) -> str | None:
         """Get label mac information"""
         if self._label_mac is None:
-            self._label_mac = ""
-            label_mac = await self._async_get_settings("label_mac")
-            if label_mac and "label_mac" in label_mac:
-                self._label_mac = label_mac["label_mac"]
+            if self._api.mac:
+                self._label_mac = format_mac(self._api.mac)
+            else:
+                self._label_mac = ""
         return self._label_mac or None
 
     async def get_model(self) -> str | None:

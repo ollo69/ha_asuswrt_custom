@@ -4,9 +4,9 @@
   "config_flow": true,
   "documentation": "https://github.com/ollo69/ha_asuswrt_custom",
   "issue_tracker": "https://github.com/ollo69/ha_asuswrt_custom/issues",
-  "requirements": ["aioasuswrt==1.4.0", "pyasuswrt==0.1.2"],
+  "requirements": ["aioasuswrt==1.4.0", "pyasuswrt==0.1.3"],
   "codeowners": ["@ollo69"],
   "iot_class": "local_polling",
   "loggers": ["aioasuswrt", "asyncssh", "pyasuswrt"],
-  "version": "0.1.1"
+  "version": "0.1.2"
 }

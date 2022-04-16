@@ -21,7 +21,6 @@ from homeassistant.const import (
 from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.device_registry import format_mac
 
 from .bridge import AsusWrtBridge
 from .const import (
@@ -132,9 +131,7 @@ class AsusWrtFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.error("Error connecting to the AsusWrt router at %s", self._host)
             return RESULT_CONN_ERROR, None
 
-        unique_id = None
-        if label_mac := await api.get_label_mac():
-            unique_id = format_mac(label_mac)
+        unique_id = await api.get_label_mac()
         await api.async_disconnect()
 
         return RESULT_SUCCESS, unique_id

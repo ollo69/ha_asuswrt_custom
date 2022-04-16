@@ -23,7 +23,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .bridge import AsusWrtBridge
+from .bridge import AsusWrtBridge, BridgeDevice
 from .const import (
     CONF_DNSMASQ,
     CONF_INTERFACE,
@@ -102,15 +102,16 @@ class AsusWrtSensorDataHandler:
 class AsusWrtDevInfo:
     """Representation of a AsusWrt device info."""
 
-    def __init__(self, mac, name=None):
+    def __init__(self, mac: str, name: str | None = None) -> None:
         """Initialize a AsusWrt device info."""
         self._mac = mac
         self._name = name
-        self._ip_address = None
-        self._last_activity = None
+        self._ip_address: str | None = None
+        self._last_activity: datetime | None = None
         self._connected = False
+        self._connected_to: str | None = None
 
-    def update(self, dev_info=None, consider_home=0):
+    def update(self, dev_info: BridgeDevice | None = None, consider_home: int = 0) -> None:
         """Update AsusWrt device info."""
         utc_point_in_time = dt_util.utcnow()
         if dev_info:
@@ -119,37 +120,44 @@ class AsusWrtDevInfo:
             self._ip_address = dev_info.ip
             self._last_activity = utc_point_in_time
             self._connected = True
+            self._connected_to = dev_info.connected_to
 
         elif self._connected:
             self._connected = (
                 utc_point_in_time - self._last_activity
             ).total_seconds() < consider_home
             self._ip_address = None
+            self._connected_to = None
 
     @property
-    def is_connected(self):
+    def is_connected(self) -> bool:
         """Return connected status."""
         return self._connected
 
     @property
-    def mac(self):
+    def mac(self) -> str:
         """Return device mac address."""
         return self._mac
 
     @property
-    def name(self):
+    def name(self) -> str | None:
         """Return device name."""
         return self._name
 
     @property
-    def ip_address(self):
+    def ip_address(self) -> str | None:
         """Return device ip address."""
         return self._ip_address
 
     @property
-    def last_activity(self):
+    def last_activity(self) -> datetime | None:
         """Return device last activity."""
         return self._last_activity
+
+    @property
+    def connected_to(self) -> str | None:
+        """Return node to which device is connected."""
+        return self._connected_to
 
 
 class AsusWrtRouter:
@@ -166,7 +174,7 @@ class AsusWrtRouter:
         self._model = "Asus Router"
         self._sw_v: str | None = None
 
-        self._devices: dict[str, Any] = {}
+        self._devices: dict[str, AsusWrtDevInfo] = {}
         self._connected_devices = 0
         self._connect_error = False
 
@@ -244,7 +252,7 @@ class AsusWrtRouter:
         new_device = False
         _LOGGER.debug("Checking devices for ASUS router %s", self._host)
         try:
-            api_devices = await self._api.async_get_connected_devices()
+            wrt_devices = await self._api.async_get_connected_devices()
         except UpdateFailed as exc:
             if not self._connect_error:
                 self._connect_error = True
@@ -259,13 +267,12 @@ class AsusWrtRouter:
             self._connect_error = False
             _LOGGER.info("Reconnected to ASUS router %s", self._host)
 
-        self._connected_devices = len(api_devices)
+        self._connected_devices = len(wrt_devices)
         consider_home = self._options.get(
             CONF_CONSIDER_HOME, DEFAULT_CONSIDER_HOME.total_seconds()
         )
         track_unknown = self._options.get(CONF_TRACK_UNKNOWN, DEFAULT_TRACK_UNKNOWN)
 
-        wrt_devices = {format_mac(mac): dev for mac, dev in api_devices.items()}
         for device_mac, device in self._devices.items():
             dev_info = wrt_devices.pop(device_mac, None)
             device.update(dev_info, consider_home)
@@ -381,7 +388,7 @@ class AsusWrtRouter:
         return self._host if self.unique_id else DEFAULT_NAME
 
     @property
-    def devices(self) -> dict[str, Any]:
+    def devices(self) -> dict[str, AsusWrtDevInfo]:
         """Return devices."""
         return self._devices
 
