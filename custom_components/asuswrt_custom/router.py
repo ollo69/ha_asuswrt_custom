@@ -124,8 +124,10 @@ class AsusWrtDevInfo:
 
         elif self._connected:
             self._connected = (
-                utc_point_in_time - self._last_activity
-            ).total_seconds() < consider_home
+                self._last_activity is not None
+                and (utc_point_in_time - self._last_activity).total_seconds()
+                < consider_home
+            )
             self._ip_address = None
             self._connected_to = None
 
@@ -275,7 +277,7 @@ class AsusWrtRouter:
 
         for device_mac, device in self._devices.items():
             dev_info = wrt_devices.pop(device_mac, None)
-            device.update(dev_info, consider_home)
+            device.update(dev_info, consider_home)  # type: ignore[arg-type]
 
         for device_mac, dev_info in wrt_devices.items():
             if not track_unknown and not dev_info.name:
@@ -343,7 +345,7 @@ class AsusWrtRouter:
         for name, new_opt in new_options.items():
             if name in CONF_REQ_RELOAD:
                 old_opt = self._options.get(name)
-                if not old_opt or old_opt != new_opt:
+                if old_opt is None or old_opt != new_opt:
                     req_reload = True
                     break
 
