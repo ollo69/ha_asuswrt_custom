@@ -66,8 +66,8 @@ class AsusWrtBridge(ABC):
     @staticmethod
     def get_bridge(
         hass: HomeAssistant,
-        conf: dict,
-        options: dict | None = None
+        conf: dict[str, Any],
+        options: dict[str, Any] | None = None
     ) -> AsusWrtBridge:
         """Get Bridge instance."""
         protocol = conf[CONF_PROTOCOL]
@@ -122,7 +122,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
     """The Bridge that use legacy library."""
 
     def __init__(
-        self, conf: dict, options: dict | None = None
+        self, conf: dict[str, Any], options: dict[str, Any] | None = None
     ) -> None:
         """Initialize Bridge."""
         super().__init__()
@@ -130,7 +130,9 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
         self._api = self._get_api(conf, options)
 
     @staticmethod
-    def _get_api(conf: dict, options: dict | None = None) -> AsusWrtLegacy:
+    def _get_api(
+        conf: dict[str, Any], options: dict[str, Any] | None = None
+    ) -> AsusWrtLegacy:
         """Get the AsusWrtLegacy API."""
         opt = options or {}
 
@@ -288,13 +290,13 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
 class AsusWrtHttpBridge(AsusWrtBridge):
     """The Bridge that use HTTP library."""
 
-    def __init__(self, conf: dict, session: ClientSession) -> None:
+    def __init__(self, conf: dict[str, Any], session: ClientSession) -> None:
         """Initialize Bridge that use HTTP library."""
         super().__init__()
         self._api = self._get_api(conf, session)
 
     @staticmethod
-    def _get_api(conf: dict, session: ClientSession) -> AsusWrtHttp:
+    def _get_api(conf: dict[str, Any], session: ClientSession) -> AsusWrtHttp:
         """Get the AsusWrtHttp API."""
         return AsusWrtHttp(
             conf[CONF_HOST],

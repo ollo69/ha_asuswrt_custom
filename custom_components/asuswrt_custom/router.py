@@ -171,21 +171,21 @@ class AsusWrtRouter:
         self._entry = entry
 
         self._api: AsusWrtBridge | None = None
-        self._protocol = entry.data[CONF_PROTOCOL]
-        self._host = entry.data[CONF_HOST]
-        self._model = "Asus Router"
+        self._protocol: str = entry.data[CONF_PROTOCOL]
+        self._host: str = entry.data[CONF_HOST]
+        self._model: str = "Asus Router"
         self._sw_v: str | None = None
 
         self._devices: dict[str, AsusWrtDevInfo] = {}
-        self._connected_devices = 0
-        self._connect_error = False
+        self._connected_devices: int = 0
+        self._connect_error: bool = False
 
         self._sensors_data_handler: AsusWrtSensorDataHandler | None = None
         self._sensors_coordinator: dict[str, Any] = {}
 
         self._on_close: list[Callable] = []
 
-        self._options = {
+        self._options: dict[str, Any] = {
             CONF_DNSMASQ: DEFAULT_DNSMASQ,
             CONF_INTERFACE: DEFAULT_INTERFACE,
             CONF_REQUIRE_IP: True,
@@ -270,14 +270,16 @@ class AsusWrtRouter:
             _LOGGER.info("Reconnected to ASUS router %s", self._host)
 
         self._connected_devices = len(wrt_devices)
-        consider_home = self._options.get(
+        consider_home: int = self._options.get(
             CONF_CONSIDER_HOME, DEFAULT_CONSIDER_HOME.total_seconds()
         )
-        track_unknown = self._options.get(CONF_TRACK_UNKNOWN, DEFAULT_TRACK_UNKNOWN)
+        track_unknown: bool = self._options.get(
+            CONF_TRACK_UNKNOWN, DEFAULT_TRACK_UNKNOWN
+        )
 
         for device_mac, device in self._devices.items():
             dev_info = wrt_devices.pop(device_mac, None)
-            device.update(dev_info, consider_home)  # type: ignore[arg-type]
+            device.update(dev_info, consider_home)
 
         for device_mac, dev_info in wrt_devices.items():
             if not track_unknown and not dev_info.name:
@@ -339,7 +341,7 @@ class AsusWrtRouter:
         """Add a function to call when router is closed."""
         self._on_close.append(func)
 
-    def update_options(self, new_options: dict) -> bool:
+    def update_options(self, new_options: dict[str, Any]) -> bool:
         """Update router options."""
         req_reload = False
         for name, new_opt in new_options.items():
