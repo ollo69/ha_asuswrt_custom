@@ -1,10 +1,10 @@
 """Represent the AsusWrt router."""
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from datetime import datetime, timedelta
 import logging
-from typing import Any, TypeVar
+from typing import Any
 
 from homeassistant.components.device_tracker.const import (
     CONF_CONSIDER_HOME,
@@ -46,8 +46,6 @@ SCAN_INTERVAL = timedelta(seconds=30)
 
 SENSORS_TYPE_COUNT = "sensors_count"
 
-_T = TypeVar("_T")
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -74,7 +72,7 @@ class AsusWrtSensorDataHandler:
     async def get_coordinator(
         self,
         sensor_type: str,
-        update_method: Callable[[], Awaitable[_T]] | None = None,
+        update_method: Callable[[], Any] | None = None,
     ) -> DataUpdateCoordinator:
         """Get the coordinator for a specific sensor type."""
         should_poll = True
