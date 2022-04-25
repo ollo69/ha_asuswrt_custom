@@ -45,7 +45,7 @@ SENSORS_TYPE_LOAD_AVG = "sensors_load_avg"
 SENSORS_TYPE_RATES = "sensors_rates"
 SENSORS_TYPE_TEMPERATURES = "sensors_temperatures"
 
-BridgeDevice = namedtuple("BridgeDevice", ["ip", "name", "connected_to"])
+WrtDevice = namedtuple("WrtDevice", ["ip", "name", "connected_to"])
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,9 +65,7 @@ class AsusWrtBridge(ABC):
 
     @staticmethod
     def get_bridge(
-        hass: HomeAssistant,
-        conf: dict[str, Any],
-        options: dict[str, Any] | None = None
+        hass: HomeAssistant, conf: dict[str, Any], options: dict[str, Any] | None = None
     ) -> AsusWrtBridge:
         """Get Bridge instance."""
         protocol = conf[CONF_PROTOCOL]
@@ -85,9 +83,24 @@ class AsusWrtBridge(ABC):
         self._model: str | None = None
 
     @property
+    def firmware(self) -> str | None:
+        """Return firmware information."""
+        return self._firmware or None
+
+    @property
+    def label_mac(self) -> str | None:
+        """Return label mac information."""
+        return self._label_mac or None
+
+    @property
+    def model(self) -> str | None:
+        """Return model information."""
+        return self._model or None
+
+    @property
+    @abstractmethod
     def is_connected(self) -> bool:
         """Get connected status."""
-        return False
 
     @abstractmethod
     async def async_connect(self) -> None:
@@ -98,24 +111,12 @@ class AsusWrtBridge(ABC):
         """Disconnect to the device."""
 
     @abstractmethod
-    async def async_get_connected_devices(self) -> dict[str, BridgeDevice]:
+    async def async_get_connected_devices(self) -> dict[str, WrtDevice]:
         """Get list of connected devices."""
 
-    async def get_firmware(self) -> str | None:
-        """Get firmware information"""
-        return self._firmware
-
-    async def get_label_mac(self) -> str | None:
-        """Get label mac information"""
-        return self._label_mac
-
-    async def get_model(self) -> str | None:
-        """Get model information"""
-        return self._model
-
+    @abstractmethod
     async def async_get_available_sensors(self) -> dict[str, dict[str, Any]]:
         """Return a dictionary of available sensors for this bridge."""
-        return {}
 
 
 class AsusWrtLegacyBridge(AsusWrtBridge):
@@ -161,19 +162,24 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
         except OSError as exc:
             raise ConfigEntryNotReady from exc
 
+        # get main router properties
+        await self._get_label_mac()
+        await self._get_firmware()
+        await self._get_model()
+
     async def async_disconnect(self) -> None:
         """Disconnect to the device."""
         if self._api is not None and self._protocol == PROTOCOL_TELNET:
             self._api.connection.disconnect()
 
-    async def async_get_connected_devices(self) -> dict[str, BridgeDevice]:
+    async def async_get_connected_devices(self) -> dict[str, WrtDevice]:
         """Get list of connected devices."""
         try:
             api_devices = await self._api.async_get_connected_devices()
         except OSError as exc:
             raise UpdateFailed(exc) from exc
         return {
-            format_mac(mac): BridgeDevice(dev.ip, dev.name, None)
+            format_mac(mac): WrtDevice(dev.ip, dev.name, None)
             for mac, dev in api_devices.items()
         }
 
@@ -183,12 +189,22 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
         try:
             info = await self._api.async_get_nvram(info_type)
         except OSError as exc:
-            _LOGGER.warning("Error calling method async_get_nvram(%s): %s", info_type, exc)
+            _LOGGER.warning(
+                "Error calling method async_get_nvram(%s): %s", info_type, exc
+            )
 
         return info
 
-    async def get_firmware(self) -> str | None:
-        """Get firmware information"""
+    async def _get_label_mac(self) -> None:
+        """Get label mac information."""
+        if self._label_mac is None:
+            self._label_mac = ""
+            label_mac = await self._get_nvram_info("LABEL_MAC")
+            if label_mac and "label_mac" in label_mac:
+                self._label_mac = format_mac(label_mac["label_mac"])
+
+    async def _get_firmware(self) -> None:
+        """Get firmware information."""
         if self._firmware is None:
             self._firmware = ""
             firmware = await self._get_nvram_info("FIRMWARE")
@@ -196,41 +212,28 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
                 self._firmware = firmware["firmver"]
                 if "buildno" in firmware:
                     self._firmware += f" (build {firmware['buildno']})"
-        return self._firmware or None
 
-    async def get_label_mac(self) -> str | None:
-        """Get label mac information"""
-        if self._label_mac is None:
-            self._label_mac = ""
-            label_mac = await self._get_nvram_info("LABEL_MAC")
-            if label_mac and "label_mac" in label_mac:
-                self._label_mac = format_mac(label_mac["label_mac"])
-        return self._label_mac or None
-
-    async def get_model(self) -> str | None:
-        """Get model information"""
+    async def _get_model(self) -> None:
+        """Get model information."""
         if self._model is None:
             self._model = ""
             model = await self._get_nvram_info("MODEL")
             if model and "model" in model:
                 self._model = model["model"]
-        return self._model or None
 
     async def async_get_available_sensors(self) -> dict[str, dict[str, Any]]:
         """Return a dictionary of available sensors for this bridge."""
         sensors_temperatures = await self._get_available_temperature_sensors()
         sensors_types = {
-            SENSORS_TYPE_BYTES: {
-                "sensors": SENSORS_BYTES, "method": self._get_bytes
-            },
+            SENSORS_TYPE_BYTES: {"sensors": SENSORS_BYTES, "method": self._get_bytes},
             SENSORS_TYPE_LOAD_AVG: {
-                "sensors": SENSORS_LOAD_AVG, "method": self._get_load_avg
+                "sensors": SENSORS_LOAD_AVG,
+                "method": self._get_load_avg,
             },
-            SENSORS_TYPE_RATES: {
-                "sensors": SENSORS_RATES, "method": self._get_rates
-            },
+            SENSORS_TYPE_RATES: {"sensors": SENSORS_RATES, "method": self._get_rates},
             SENSORS_TYPE_TEMPERATURES: {
-                "sensors": sensors_temperatures, "method": self._get_temperatures
+                "sensors": sensors_temperatures,
+                "method": self._get_temperatures,
             },
         }
         return sensors_types
@@ -280,7 +283,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
     async def _get_temperatures(self) -> dict[str, Any]:
         """Fetch temperatures information from the router."""
         try:
-            temperatures = await self._api.async_get_temperature()
+            temperatures: dict[str, Any] = await self._api.async_get_temperature()
         except (OSError, ValueError) as exc:
             raise UpdateFailed(exc) from exc
 
@@ -319,18 +322,24 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         except AsusWrtError as exc:
             raise ConfigEntryNotReady from exc
 
+        # get main router properties
+        if mac := self._api.mac:
+            self._label_mac = format_mac(mac)
+        await self._get_firmware()
+        await self._get_model()
+
     async def async_disconnect(self) -> None:
         """Disconnect to the device."""
         await self._api.async_disconnect()
 
-    async def async_get_connected_devices(self) -> dict[str, BridgeDevice]:
+    async def async_get_connected_devices(self) -> dict[str, WrtDevice]:
         """Get list of connected devices."""
         try:
             api_devices = await self._api.async_get_connected_devices()
         except AsusWrtError as exc:
             raise UpdateFailed(exc) from exc
         return {
-            format_mac(mac): BridgeDevice(dev.ip, dev.name, dev.node)
+            format_mac(mac): WrtDevice(dev.ip, dev.name, dev.node)
             for mac, dev in api_devices.items()
         }
 
@@ -340,46 +349,33 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         try:
             info = await self._api.async_get_settings(info_type)
         except AsusWrtError as exc:
-            _LOGGER.warning("Error calling method async_get_settings(%s): %s", info_type, exc)
+            _LOGGER.warning(
+                "Error calling method async_get_settings(%s): %s", info_type, exc
+            )
 
         return info
 
-    async def get_firmware(self) -> str | None:
-        """Get firmware information"""
+    async def _get_firmware(self) -> None:
+        """Get firmware information."""
         if self._firmware is None:
             self._firmware = ""
             firmware = await self._async_get_settings("innerver")
             if firmware and "innerver" in firmware:
                 self._firmware = firmware["innerver"]
-        return self._firmware or None
 
-    async def get_label_mac(self) -> str | None:
-        """Get label mac information"""
-        if self._label_mac is None:
-            if self._api.mac:
-                self._label_mac = format_mac(self._api.mac)
-            else:
-                self._label_mac = ""
-        return self._label_mac or None
-
-    async def get_model(self) -> str | None:
-        """Get model information"""
+    async def _get_model(self) -> None:
+        """Get model information."""
         if self._model is None:
             self._model = ""
             model = await self._async_get_settings("productid")
             if model and "productid" in model:
                 self._model = model["productid"]
-        return self._model or None
 
     async def async_get_available_sensors(self) -> dict[str, dict[str, Any]]:
         """Return a dictionary of available sensors for this bridge."""
         sensors_types = {
-            SENSORS_TYPE_BYTES: {
-                "sensors": SENSORS_BYTES, "method": self._get_bytes
-            },
-            SENSORS_TYPE_RATES: {
-                "sensors": SENSORS_RATES, "method": self._get_rates
-            },
+            SENSORS_TYPE_BYTES: {"sensors": SENSORS_BYTES, "method": self._get_bytes},
+            SENSORS_TYPE_RATES: {"sensors": SENSORS_RATES, "method": self._get_rates},
         }
         return sensors_types
 

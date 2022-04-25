@@ -23,7 +23,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .bridge import AsusWrtBridge, BridgeDevice
+from .bridge import AsusWrtBridge, WrtDevice
 from .const import (
     CONF_DNSMASQ,
     CONF_INTERFACE,
@@ -111,7 +111,7 @@ class AsusWrtDevInfo:
         self._connected = False
         self._connected_to: str | None = None
 
-    def update(self, dev_info: BridgeDevice | None = None, consider_home: int = 0) -> None:
+    def update(self, dev_info: WrtDevice | None = None, consider_home: int = 0) -> None:
         """Update AsusWrt device info."""
         utc_point_in_time = dt_util.utcnow()
         if dev_info:
@@ -170,11 +170,9 @@ class AsusWrtRouter:
         self.hass = hass
         self._entry = entry
 
-        self._api: AsusWrtBridge | None = None
+        self._api: AsusWrtBridge = None
         self._protocol: str = entry.data[CONF_PROTOCOL]
         self._host: str = entry.data[CONF_HOST]
-        self._model: str = "Asus Router"
-        self._sw_v: str | None = None
 
         self._devices: dict[str, AsusWrtDevInfo] = {}
         self._connected_devices: int = 0
@@ -201,11 +199,6 @@ class AsusWrtRouter:
         await self._api.async_connect()
         if not self._api.is_connected:
             raise ConfigEntryNotReady
-
-        # System
-        if model := await self._api.get_model():
-            self._model = model
-        self._sw_v = await self._api.get_firmware()
 
         # Load tracked entities from registry
         entity_reg = er.async_get(self.hass)
@@ -357,14 +350,15 @@ class AsusWrtRouter:
     @property
     def device_info(self) -> DeviceInfo:
         """Return the device information."""
-        return DeviceInfo(
+        info = DeviceInfo(
             identifiers={(DOMAIN, self.unique_id or "AsusWRT")},
             name=self._host,
-            model=self._model,
+            model=self._api.model or "Asus Router",
             manufacturer="Asus",
-            sw_version=self._sw_v,
             configuration_url=f"http://{self._host}",
         )
+        if self._api.firmware:
+            info["sw_version"] = self._api.firmware
 
     @property
     def signal_device_new(self) -> str:
@@ -380,6 +374,11 @@ class AsusWrtRouter:
     def host(self) -> str:
         """Return router hostname."""
         return self._host
+
+    @property
+    def mac(self) -> str | None:
+        """Return router mac address."""
+        return self._api.label_mac
 
     @property
     def unique_id(self) -> str | None:
