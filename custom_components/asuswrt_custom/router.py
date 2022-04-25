@@ -170,7 +170,7 @@ class AsusWrtRouter:
         self.hass = hass
         self._entry = entry
 
-        self._api: AsusWrtBridge = None
+        self._api: AsusWrtBridge
         self._protocol: str = entry.data[CONF_PROTOCOL]
         self._host: str = entry.data[CONF_HOST]
 
@@ -323,7 +323,6 @@ class AsusWrtRouter:
         """Close the connection."""
         if self._api is not None:
             await self._api.async_disconnect()
-        self._api = None
 
         for func in self._on_close:
             func()
@@ -359,6 +358,8 @@ class AsusWrtRouter:
         )
         if self._api.firmware:
             info["sw_version"] = self._api.firmware
+
+        return info
 
     @property
     def signal_device_new(self) -> str:

@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from aioasuswrt.asuswrt import AsusWrt as AsusWrtLegacy
-from aiohttp import ClientSession
 from collections import namedtuple
 import logging
-from pyasuswrt import AsusWrtHttp, AsusWrtError
 from typing import Any
+
+from aioasuswrt.asuswrt import AsusWrt as AsusWrtLegacy
+from aiohttp import ClientSession
+from pyasuswrt import AsusWrtError, AsusWrtHttp
 
 from homeassistant.const import (
     CONF_HOST,
@@ -76,8 +77,6 @@ class AsusWrtBridge(ABC):
 
     def __init__(self) -> None:
         """Initialize Bridge."""
-        self._api = None
-
         self._firmware: str | None = None
         self._label_mac: str | None = None
         self._model: str | None = None
@@ -127,8 +126,8 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
     ) -> None:
         """Initialize Bridge."""
         super().__init__()
-        self._protocol = conf[CONF_PROTOCOL]
-        self._api = self._get_api(conf, options)
+        self._protocol: str = conf[CONF_PROTOCOL]
+        self._api: AsusWrtLegacy = self._get_api(conf, options)
 
     @staticmethod
     def _get_api(
@@ -153,7 +152,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
     @property
     def is_connected(self) -> bool:
         """Get connected status."""
-        return self._api.is_connected
+        return bool(self._api.is_connected)
 
     async def async_connect(self) -> None:
         """Connect to the device."""
@@ -209,9 +208,10 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
             self._firmware = ""
             firmware = await self._get_nvram_info("FIRMWARE")
             if firmware and "firmver" in firmware:
-                self._firmware = firmware["firmver"]
+                firmver: str = firmware["firmver"]
                 if "buildno" in firmware:
-                    self._firmware += f" (build {firmware['buildno']})"
+                    firmver += f" (build {firmware['buildno']})"
+                self._firmware = firmver
 
     async def _get_model(self) -> None:
         """Get model information."""
@@ -296,7 +296,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     def __init__(self, conf: dict[str, Any], session: ClientSession) -> None:
         """Initialize Bridge that use HTTP library."""
         super().__init__()
-        self._api = self._get_api(conf, session)
+        self._api: AsusWrtHttp = self._get_api(conf, session)
 
     @staticmethod
     def _get_api(conf: dict[str, Any], session: ClientSession) -> AsusWrtHttp:
@@ -313,7 +313,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     @property
     def is_connected(self) -> bool:
         """Get connected status."""
-        return self._api.is_connected
+        return bool(self._api.is_connected)
 
     async def async_connect(self) -> None:
         """Connect to the device."""
