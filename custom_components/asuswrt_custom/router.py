@@ -168,7 +168,6 @@ class AsusWrtRouter:
         self.hass = hass
         self._entry = entry
 
-        self._api: AsusWrtBridge
         self._protocol: str = entry.data[CONF_PROTOCOL]
         self._host: str = entry.data[CONF_HOST]
 
@@ -188,12 +187,12 @@ class AsusWrtRouter:
         }
         self._options.update(entry.options)
 
-    async def setup(self) -> None:
-        """Set up a AsusWrt router."""
-        self._api = AsusWrtBridge.get_bridge(
+        self._api: AsusWrtBridge = AsusWrtBridge.get_bridge(
             self.hass, dict(self._entry.data), self._options
         )
 
+    async def setup(self) -> None:
+        """Set up a AsusWrt router."""
         await self._api.async_connect()
         if not self._api.is_connected:
             raise ConfigEntryNotReady
