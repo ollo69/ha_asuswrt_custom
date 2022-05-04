@@ -150,14 +150,10 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Handle a flow initiated by the user."""
 
-        # if exist one entry without unique ID, we abort config flow
+        # if there's one entry without unique ID, we abort config flow
         for unique_id in self._async_current_ids():
             if unique_id is None:
-                _LOGGER.warning(
-                    "A device without a valid UniqueID is already configured."
-                    " Configuration of multiple instance is not possible"
-                )
-                return self.async_abort(reason="single_instance_allowed")
+                return self.async_abort(reason="no_unique_id")
 
         if user_input is None:
             return self._show_setup_form(user_input)
@@ -173,7 +169,7 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
         ssh: str | None = user_input.get(CONF_SSH_KEY)
 
         if not pwd and protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
-            errors["base"] = "pwd_http_request"
+            errors["base"] = "pwd_required"
         elif not (pwd or ssh):
             errors["base"] = "pwd_or_ssh"
         elif ssh:
@@ -194,13 +190,12 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
             if result == RESULT_SUCCESS:
                 if unique_id:
                     await self.async_set_unique_id(unique_id)
-                    self._abort_if_unique_id_configured()
-                # we allow to configure a single instance without unique id
+                # we allow configure a single instance without unique id
                 elif self._async_current_entries():
                     return self.async_abort(reason="invalid_unique_id")
                 else:
                     _LOGGER.warning(
-                        "This device do not provide a valid Unique ID."
+                        "This device does not provide a valid Unique ID."
                         " Configuration of multiple instance will not be possible"
                     )
 
