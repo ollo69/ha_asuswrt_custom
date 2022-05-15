@@ -15,6 +15,7 @@ from homeassistant.components.device_tracker.const import (
 )
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.const import (
+    CONF_BASE,
     CONF_HOST,
     CONF_MODE,
     CONF_PASSWORD,
@@ -79,41 +80,56 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self):
+        """Initialize the AsusWrt config flow."""
+        self._config_data: dict[str, Any] = {}
+        self._error: str | None = None
+
     @callback
-    def _show_setup_form(
-        self,
-        user_input: dict[str, Any] | None = None,
-        errors: dict[str, str] | None = None,
-    ) -> FlowResult:
+    def _show_setup_form(self, error: str | None = None) -> FlowResult:
         """Show the setup form to the user."""
 
-        if user_input is None:
-            user_input = {}
-
-        adv_schema = {}
-        conf_password = vol.Required(CONF_PASSWORD)
-        if self.show_advanced_options:
-            conf_password = vol.Optional(CONF_PASSWORD)
-            adv_schema[vol.Optional(CONF_PORT)] = cv.port
-            adv_schema[vol.Optional(CONF_SSH_KEY)] = str
+        base_err = error or self._error
+        self._error = None
+        user_input = self._config_data
 
         schema = {
             vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
             vol.Required(CONF_USERNAME, default=user_input.get(CONF_USERNAME, "")): str,
-            conf_password: str,
-            vol.Required(CONF_PROTOCOL, default=PROTOCOL_HTTP): vol.In(
-                ALLOWED_PROTOCOL
-            ),
-            **adv_schema,
+            vol.Optional(CONF_PASSWORD): str,
+            vol.Required(
+                CONF_PROTOCOL, default=user_input.get(CONF_PROTOCOL, PROTOCOL_HTTP)
+            ): vol.In(ALLOWED_PROTOCOL),
+        }
+        if self.show_advanced_options:
+            schema[vol.Optional(CONF_PORT)] = cv.port
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(schema),
+            errors={CONF_BASE: base_err} if base_err else None,
+        )
+
+    @callback
+    def _show_legacy_form(self, error: str | None = None) -> FlowResult:
+        """Show the setup form to the user for legacy options."""
+
+        ssh_schema = {}
+        protocol = self._config_data[CONF_PROTOCOL]
+        if protocol == PROTOCOL_SSH and CONF_PASSWORD not in self._config_data:
+            ssh_schema[vol.Required(CONF_SSH_KEY)] = str
+
+        schema = {
+            **ssh_schema,
             vol.Required(CONF_MODE, default=MODE_ROUTER): vol.In(
                 {MODE_ROUTER: "Router", MODE_AP: "Access Point"}
             ),
         }
 
         return self.async_show_form(
-            step_id="user",
+            step_id="legacy",
             data_schema=vol.Schema(schema),
-            errors=errors or {},
+            errors={CONF_BASE: error} if error else None,
         )
 
     async def _async_check_connection(
@@ -156,57 +172,65 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
                 return self.async_abort(reason="no_unique_id")
 
         if user_input is None:
-            return self._show_setup_form(user_input)
+            return self._show_setup_form()
 
-        errors: dict[str, str] = {}
-        host: str = user_input[CONF_HOST]
-
+        self._config_data = user_input
         protocol: str = user_input[CONF_PROTOCOL]
-        if protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
-            user_input.pop(CONF_MODE, None)
-
         pwd: str | None = user_input.get(CONF_PASSWORD)
-        ssh: str | None = user_input.get(CONF_SSH_KEY)
 
-        if not pwd and protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
-            errors["base"] = "pwd_required"
-        elif not (pwd or ssh):
-            errors["base"] = "pwd_or_ssh"
-        elif ssh:
-            if pwd:
-                errors["base"] = "pwd_and_ssh"
-            else:
-                isfile = await self.hass.async_add_executor_job(_is_file, ssh)
-                if not isfile:
-                    errors["base"] = "ssh_not_file"
+        if not pwd and protocol != PROTOCOL_SSH:
+            return self._show_setup_form(error="pwd_required")
 
-        if not errors:
-            ip_address = await self.hass.async_add_executor_job(_get_ip, host)
-            if not ip_address:
-                errors["base"] = "invalid_host"
+        host: str = user_input[CONF_HOST]
+        ip_address = await self.hass.async_add_executor_job(_get_ip, host)
+        if not ip_address:
+            return self._show_setup_form(error="invalid_host")
 
-        if not errors:
-            result, unique_id = await self._async_check_connection(user_input)
-            if result == RESULT_SUCCESS:
-                if unique_id:
-                    await self.async_set_unique_id(unique_id)
-                # we allow configure a single instance without unique id
-                elif self._async_current_entries():
-                    return self.async_abort(reason="invalid_unique_id")
-                else:
-                    _LOGGER.warning(
-                        "This device does not provide a valid Unique ID."
-                        " Configuration of multiple instance will not be possible"
-                    )
+        if protocol in [PROTOCOL_SSH, PROTOCOL_TELNET]:
+            return await self.async_step_legacy()
 
-                return self.async_create_entry(
-                    title=host,
-                    data=user_input,
-                )
+        result, unique_id = await self._async_check_connection(user_input)
+        if result == RESULT_SUCCESS:
+            return await self._async_save_entry(unique_id)
 
-            errors["base"] = result
+        return self._show_setup_form(error=result)
 
-        return self._show_setup_form(user_input, errors)
+    async def async_step_legacy(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle a flow for legacy settings."""
+        if user_input is None:
+            return self._show_legacy_form()
+
+        self._config_data.update(user_input)
+        if ssh := user_input.get(CONF_SSH_KEY):
+            if not await self.hass.async_add_executor_job(_is_file, ssh):
+                return self._show_legacy_form(error="ssh_not_file")
+
+        result, unique_id = await self._async_check_connection(self._config_data)
+        if result == RESULT_SUCCESS:
+            return await self._async_save_entry(unique_id)
+
+        self._error = result
+        return await self.async_step_user()
+
+    async def _async_save_entry(self, unique_id: str | None) -> FlowResult:
+        """Save entry data if unique id is valid."""
+        if unique_id:
+            await self.async_set_unique_id(unique_id)
+        # we allow to configure a single instance without unique id
+        elif self._async_current_entries():
+            return self.async_abort(reason="invalid_unique_id")
+        else:
+            _LOGGER.warning(
+                "This device does not provide a valid Unique ID."
+                " Configuration of multiple instance will not be possible"
+            )
+
+        return self.async_create_entry(
+            title=self._config_data[CONF_HOST],
+            data=self._config_data,
+        )
 
     @staticmethod
     @callback
