@@ -358,10 +358,19 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     async def _get_firmware(self) -> None:
         """Get firmware information."""
         if self._firmware is None:
-            self._firmware = ""
-            firmware = await self._async_get_settings("innerver")
-            if firmware and "innerver" in firmware:
-                self._firmware = firmware["innerver"]
+            firmware = ""
+            firmver = await self._async_get_settings("firmver")
+            if firmver and "firmver" in firmver:
+                firmware = firmver["firmver"]
+            buildno = await self._async_get_settings("buildno")
+            if buildno and "buildno" in buildno:
+                if firmware:
+                    firmware += "."
+                firmware += buildno["buildno"]
+                if extendno := await self._async_get_settings("extendno"):
+                    if ext := extendno.get("extendno"):
+                        firmware += f"_{ext}"
+            self._firmware = firmware or "N/A"
 
     async def _get_model(self) -> None:
         """Get model information."""

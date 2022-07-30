@@ -1,13 +1,41 @@
 """Support for ASUSWRT devices."""
+from __future__ import annotations
+
+from collections.abc import Iterable
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EVENT_HOMEASSISTANT_STOP, Platform
+from homeassistant.const import (
+    EVENT_HOMEASSISTANT_STOP,
+    MAJOR_VERSION,
+    MINOR_VERSION,
+    Platform,
+)
 from homeassistant.core import Event, HomeAssistant
 
 from .const import DATA_ASUSWRT, DOMAIN
 from .router import AsusWrtRouter
 
 PLATFORMS = [Platform.DEVICE_TRACKER, Platform.SENSOR]
+
+
+def is_min_ha_version(min_ha_major_ver: int, min_ha_minor_ver: int) -> bool:
+    """Check if HA version at least a specific version."""
+    return (
+        MAJOR_VERSION > min_ha_major_ver or
+        (MAJOR_VERSION == min_ha_major_ver and MINOR_VERSION >= min_ha_minor_ver)
+    )
+
+
+async def async_setup_entity_platforms(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    platforms: Iterable[Platform | str],
+) -> None:
+    """Set up entity platforms using new method from HA version 2022.8."""
+    if is_min_ha_version(2022, 8):
+        await hass.config_entries.async_forward_entry_setups(config_entry, platforms)
+    else:
+        hass.config_entries.async_setup_platforms(config_entry, platforms)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -28,7 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {DATA_ASUSWRT: router}
 
-    hass.config_entries.async_setup_platforms(entry, PLATFORMS)
+    await async_setup_entity_platforms(hass, entry, PLATFORMS)
 
     return True
 
