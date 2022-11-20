@@ -1,4 +1,4 @@
-name: Validate with Hassfest
+name: Validate with Hacs
 
 on:
   push:
@@ -12,8 +12,11 @@ on:
     - cron: "0 0 * * *"
 
 jobs:
-  validate_hassfest:
+  validate_hacs:
     runs-on: "ubuntu-latest"
     steps:
       - uses: "actions/checkout@v2"
-      - uses: home-assistant/actions/hassfest@master
+      - name: HACS validation
+        uses: "hacs/action@main"
+        with:
+          category: "integration"
