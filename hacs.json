@@ -1,5 +1,5 @@
 {
   "name": "AsusWRT Custom",
   "content_in_root": false,
-  "homeassistant": "2022.4.0"
+  "homeassistant": "2022.9.0"
 }
