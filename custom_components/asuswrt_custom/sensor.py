@@ -13,7 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     DATA_GIGABYTES,
     DATA_RATE_MEGABITS_PER_SECOND,
-    TEMP_CELSIUS,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
@@ -124,7 +124,7 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         name="2.4GHz Temperature",
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         factor=1,
@@ -135,7 +135,7 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         name="5GHz Temperature",
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         factor=1,
@@ -146,7 +146,7 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         name="CPU Temperature",
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         factor=1,
