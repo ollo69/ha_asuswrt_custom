@@ -45,6 +45,20 @@ class AsusWrtSensorEntityDescription(SensorEntityDescription):
 
 UNIT_DEVICES = "Devices"
 
+TEMP_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = tuple(
+    AsusWrtSensorEntityDescription(
+        key=sens_key,
+        name=sens_name,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        factor=1,
+        precision=1,
+    )
+    for sens_key, sens_name in SENSORS_TEMPERATURES.items()
+)
 CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
     AsusWrtSensorEntityDescription(
         key=SENSORS_CONNECTED_DEVICE[0],
@@ -119,40 +133,7 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         factor=1,
         precision=1,
     ),
-    AsusWrtSensorEntityDescription(
-        key=SENSORS_TEMPERATURES[0],
-        name="2.4GHz Temperature",
-        state_class=SensorStateClass.MEASUREMENT,
-        device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        factor=1,
-        precision=1,
-    ),
-    AsusWrtSensorEntityDescription(
-        key=SENSORS_TEMPERATURES[1],
-        name="5GHz Temperature",
-        state_class=SensorStateClass.MEASUREMENT,
-        device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        factor=1,
-        precision=1,
-    ),
-    AsusWrtSensorEntityDescription(
-        key=SENSORS_TEMPERATURES[2],
-        name="CPU Temperature",
-        state_class=SensorStateClass.MEASUREMENT,
-        device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        factor=1,
-        precision=1,
-    ),
-)
+) + TEMP_SENSORS
 
 
 async def async_setup_entry(

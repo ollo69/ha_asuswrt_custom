@@ -38,6 +38,7 @@ from .const import (
     SENSORS_LOAD_AVG,
     SENSORS_RATES,
     SENSORS_TEMPERATURES,
+    SENSORS_TEMPERATURES_LEGACY,
 )
 
 SENSORS_TYPE_BYTES = "sensors_bytes"
@@ -243,7 +244,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
         try:
             availability = await self._api.async_find_temperature_commands()
             available_sensors = [
-                SENSORS_TEMPERATURES[i] for i in range(3) if availability[i]
+                SENSORS_TEMPERATURES_LEGACY[i] for i in range(3) if availability[i]
             ]
         except Exception as exc:  # pylint: disable=broad-except
             _LOGGER.debug(
@@ -382,11 +383,31 @@ class AsusWrtHttpBridge(AsusWrtBridge):
 
     async def async_get_available_sensors(self) -> dict[str, dict[str, Any]]:
         """Return a dictionary of available sensors for this bridge."""
+        sensors_temperatures = await self._get_available_temperature_sensors()
         sensors_types = {
             SENSORS_TYPE_BYTES: {"sensors": SENSORS_BYTES, "method": self._get_bytes},
             SENSORS_TYPE_RATES: {"sensors": SENSORS_RATES, "method": self._get_rates},
+            SENSORS_TYPE_TEMPERATURES: {
+                "sensors": sensors_temperatures,
+                "method": self._get_temperatures,
+            },
         }
         return sensors_types
+
+    async def _get_available_temperature_sensors(self) -> list[str]:
+        """Check which temperature information is available on the router."""
+        try:
+            available_temps = await self._api.async_get_temperatures()
+            available_sensors = [
+                t for t in SENSORS_TEMPERATURES if t in available_temps
+            ]
+        except AsusWrtError as exc:
+            _LOGGER.debug(
+                "Failed checking temperature sensor availability for ASUS router. Exception: %s",
+                exc,
+            )
+            return []
+        return available_sensors
 
     async def _get_bytes(self) -> dict[str, Any]:
         """Fetch byte information from the router."""
@@ -405,3 +426,12 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             raise UpdateFailed(exc) from exc
 
         return _get_dict(SENSORS_RATES, list(rates.values()))
+
+    async def _get_temperatures(self) -> dict[str, Any]:
+        """Fetch temperatures information from the router."""
+        try:
+            temperatures: dict[str, Any] = await self._api.async_get_temperatures()
+        except AsusWrtError as exc:
+            raise UpdateFailed(exc) from exc
+
+        return temperatures
