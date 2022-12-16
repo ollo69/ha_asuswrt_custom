@@ -37,8 +37,9 @@ from custom_components.asuswrt_custom.const import (
 )
 from custom_components.asuswrt_custom.router import DEFAULT_NAME
 
-ASUSWRT_HTTP_LIB = "custom_components.asuswrt_custom.bridge.AsusWrtHttp"
-ASUSWRT_LEGACY_LIB = "custom_components.asuswrt_custom.bridge.AsusWrtLegacy"
+ASUSWRT_BASE = "custom_components.asuswrt_custom"
+ASUSWRT_HTTP_LIB = f"{ASUSWRT_BASE}.bridge.AsusWrtHttp"
+ASUSWRT_LEGACY_LIB = f"{ASUSWRT_BASE}.bridge.AsusWrtLegacy"
 
 HOST = "myrouter.asuswrt.com"
 IP_ADDRESS = "192.168.1.1"
@@ -95,10 +96,10 @@ SENSORS_TEMP = [
 ]
 
 SENSORS_ALL_LEGACY = [*SENSORS_DEFAULT, *SENSORS_LOADAVG, *SENSORS_TEMP]
-SENSORS_ALL_HTTP = [*SENSORS_DEFAULT]
+SENSORS_ALL_HTTP = [*SENSORS_DEFAULT, *SENSORS_TEMP]
 
 PATCH_SETUP_ENTRY = patch(
-    "custom_components.asuswrt_custom.async_setup_entry",
+    f"{ASUSWRT_BASE}.async_setup_entry",
     return_value=True,
 )
 
@@ -216,6 +217,9 @@ def mock_controller_connect_http(mock_devices_http):
         service_mock.return_value.async_get_traffic_rates = AsyncMock(
             return_value=MOCK_CURRENT_TRANSFER_RATES_HTTP
         )
+        service_mock.return_value.async_get_temperatures = AsyncMock(
+            return_value={"2.4GHz": 40, "CPU": 71.2}
+        )
         yield service_mock
 
 
@@ -260,6 +264,9 @@ def mock_controller_connect_http_sens_fail():
             side_effect=AsusWrtError
         )
         service_mock.return_value.async_get_traffic_rates = AsyncMock(
+            side_effect=AsusWrtError
+        )
+        service_mock.return_value.async_get_temperatures = AsyncMock(
             side_effect=AsusWrtError
         )
         yield service_mock
@@ -425,7 +432,7 @@ async def test_loadavg_sensors(
     assert hass.states.get(f"{sensor_prefix}_load_avg_15m").state == "1.3"
 
 
-async def test_temperature_sensors_fail(
+async def test_temperature_sensors_legacy_fail(
     hass,
     connect_legacy,
     mock_available_temps,
@@ -447,12 +454,27 @@ async def test_temperature_sensors_fail(
     assert not hass.states.get(f"{sensor_prefix}_cpu_temperature")
 
 
-async def test_temperature_sensors(
+async def test_temperature_sensors_http_fail(
     hass,
-    connect_legacy,
+    connect_http_sens_fail,
 ):
+    """Test fail creating AsusWRT temperature sensors."""
+    config_entry, sensor_prefix = _setup_entry(hass, CONFIG_DATA_HTTP, SENSORS_TEMP)
+    config_entry.add_to_hass(hass)
+
+    # initial devices setup
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # assert temperature availability exception is handled correctly
+    assert not hass.states.get(f"{sensor_prefix}_2_4ghz_temperature")
+    assert not hass.states.get(f"{sensor_prefix}_5ghz_temperature")
+    assert not hass.states.get(f"{sensor_prefix}_cpu_temperature")
+
+
+async def _test_temperature_sensors(hass, config):
     """Test creating a AsusWRT temperature sensors."""
-    config_entry, sensor_prefix = _setup_entry(hass, CONFIG_DATA_TELNET, SENSORS_TEMP)
+    config_entry, sensor_prefix = _setup_entry(hass, config, SENSORS_TEMP)
     config_entry.add_to_hass(hass)
 
     # initial devices setup
@@ -465,6 +487,22 @@ async def test_temperature_sensors(
     assert hass.states.get(f"{sensor_prefix}_2_4ghz_temperature").state == "40.0"
     assert not hass.states.get(f"{sensor_prefix}_5ghz_temperature")
     assert hass.states.get(f"{sensor_prefix}_cpu_temperature").state == "71.2"
+
+
+async def test_temperature_sensors_legacy(
+    hass,
+    connect_legacy,
+):
+    """Test creating a AsusWRT temperature sensors."""
+    await _test_temperature_sensors(hass, CONFIG_DATA_TELNET)
+
+
+async def test_temperature_sensors_http(
+    hass,
+    connect_http,
+):
+    """Test creating a AsusWRT temperature sensors."""
+    await _test_temperature_sensors(hass, CONFIG_DATA_HTTP)
 
 
 @pytest.mark.parametrize(
@@ -552,7 +590,11 @@ async def test_sensors_polling_fails_http(
     connect_http_sens_fail,
 ):
     """Test AsusWRT sensors are unavailable when polling fails."""
-    await _test_sensors_polling_fails(hass, CONFIG_DATA_HTTP, SENSORS_ALL_HTTP)
+    with patch(
+        f"{ASUSWRT_BASE}.bridge.AsusWrtHttpBridge._get_available_temperature_sensors",
+        return_value=[*MOCK_TEMPERATURES],
+    ):
+        await _test_sensors_polling_fails(hass, CONFIG_DATA_HTTP, SENSORS_ALL_HTTP)
 
 
 async def _test_options_reload(hass, config):

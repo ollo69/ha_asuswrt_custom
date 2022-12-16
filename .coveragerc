@@ -1,0 +1,5 @@
+[run]
+source = custom_components
+omit =
+    custom_components/__init__.py
+    custom_components/asuswrt_custom/diagnostics.py
