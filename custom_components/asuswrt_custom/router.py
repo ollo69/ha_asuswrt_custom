@@ -33,14 +33,14 @@ from .const import (
     DEFAULT_INTERFACE,
     DEFAULT_TRACK_UNKNOWN,
     DOMAIN,
+    KEY_COORDINATOR,
+    KEY_METHOD,
+    KEY_SENSORS,
     SENSORS_CONNECTED_DEVICE,
 )
 
 CONF_REQ_RELOAD = [CONF_DNSMASQ, CONF_INTERFACE, CONF_REQUIRE_IP]
 DEFAULT_NAME = "Asuswrt"
-
-KEY_COORDINATOR = "coordinator"
-KEY_SENSORS = "sensors"
 
 SCAN_INTERVAL = timedelta(seconds=30)
 
@@ -293,13 +293,13 @@ class AsusWrtRouter:
         self._sensors_data_handler.update_device_count(self._connected_devices)
 
         sensors_types = await self._api.async_get_available_sensors()
-        sensors_types[SENSORS_TYPE_COUNT] = {"sensors": SENSORS_CONNECTED_DEVICE}
+        sensors_types[SENSORS_TYPE_COUNT] = {KEY_SENSORS: SENSORS_CONNECTED_DEVICE}
 
         for sensor_type, sensor_def in sensors_types.items():
-            if not (sensor_names := sensor_def.get("sensors")):
+            if not (sensor_names := sensor_def.get(KEY_SENSORS)):
                 continue
             coordinator = await self._sensors_data_handler.get_coordinator(
-                sensor_type, update_method=sensor_def.get("method")
+                sensor_type, update_method=sensor_def.get(KEY_METHOD)
             )
             self._sensors_coordinator[sensor_type] = {
                 KEY_COORDINATOR: coordinator,

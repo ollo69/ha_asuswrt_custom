@@ -31,6 +31,8 @@ from .const import (
     CONF_SSH_KEY,
     DEFAULT_DNSMASQ,
     DEFAULT_INTERFACE,
+    KEY_METHOD,
+    KEY_SENSORS,
     PROTOCOL_HTTP,
     PROTOCOL_HTTPS,
     PROTOCOL_TELNET,
@@ -226,15 +228,21 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
         """Return a dictionary of available sensors for this bridge."""
         sensors_temperatures = await self._get_available_temperature_sensors()
         sensors_types = {
-            SENSORS_TYPE_BYTES: {"sensors": SENSORS_BYTES, "method": self._get_bytes},
-            SENSORS_TYPE_LOAD_AVG: {
-                "sensors": SENSORS_LOAD_AVG,
-                "method": self._get_load_avg,
+            SENSORS_TYPE_BYTES: {
+                KEY_SENSORS: SENSORS_BYTES,
+                KEY_METHOD: self._get_bytes,
             },
-            SENSORS_TYPE_RATES: {"sensors": SENSORS_RATES, "method": self._get_rates},
+            SENSORS_TYPE_LOAD_AVG: {
+                KEY_SENSORS: SENSORS_LOAD_AVG,
+                KEY_METHOD: self._get_load_avg,
+            },
+            SENSORS_TYPE_RATES: {
+                KEY_SENSORS: SENSORS_RATES,
+                KEY_METHOD: self._get_rates,
+            },
             SENSORS_TYPE_TEMPERATURES: {
-                "sensors": sensors_temperatures,
-                "method": self._get_temperatures,
+                KEY_SENSORS: sensors_temperatures,
+                KEY_METHOD: self._get_temperatures,
             },
         }
         return sensors_types
@@ -385,11 +393,17 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Return a dictionary of available sensors for this bridge."""
         sensors_temperatures = await self._get_available_temperature_sensors()
         sensors_types = {
-            SENSORS_TYPE_BYTES: {"sensors": SENSORS_BYTES, "method": self._get_bytes},
-            SENSORS_TYPE_RATES: {"sensors": SENSORS_RATES, "method": self._get_rates},
+            SENSORS_TYPE_BYTES: {
+                KEY_SENSORS: SENSORS_BYTES,
+                KEY_METHOD: self._get_bytes,
+            },
+            SENSORS_TYPE_RATES: {
+                KEY_SENSORS: SENSORS_RATES,
+                KEY_METHOD: self._get_rates,
+            },
             SENSORS_TYPE_TEMPERATURES: {
-                "sensors": sensors_temperatures,
-                "method": self._get_temperatures,
+                KEY_SENSORS: sensors_temperatures,
+                KEY_METHOD: self._get_temperatures,
             },
         }
         return sensors_types
