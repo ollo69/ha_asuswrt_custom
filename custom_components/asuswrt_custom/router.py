@@ -12,7 +12,6 @@ from homeassistant.components.device_tracker.const import (
     DOMAIN as TRACKER_DOMAIN,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PROTOCOL
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er
@@ -168,9 +167,6 @@ class AsusWrtRouter:
         self.hass = hass
         self._entry = entry
 
-        self._protocol: str = entry.data[CONF_PROTOCOL]
-        self._host: str = entry.data[CONF_HOST]
-
         self._devices: dict[str, AsusWrtDevInfo] = {}
         self._connected_devices: int = 0
         self._connect_error: bool = False
@@ -242,7 +238,7 @@ class AsusWrtRouter:
     async def update_devices(self) -> None:
         """Update AsusWrt devices tracker."""
         new_device = False
-        _LOGGER.debug("Checking devices for ASUS router %s", self._host)
+        _LOGGER.debug("Checking devices for ASUS router %s", self.host)
         try:
             wrt_devices = await self._api.async_get_connected_devices()
         except UpdateFailed as exc:
@@ -250,14 +246,14 @@ class AsusWrtRouter:
                 self._connect_error = True
                 _LOGGER.error(
                     "Error connecting to ASUS router %s for device update: %s",
-                    self._host,
+                    self.host,
                     exc,
                 )
             return
 
         if self._connect_error:
             self._connect_error = False
-            _LOGGER.info("Reconnected to ASUS router %s", self._host)
+            _LOGGER.info("Reconnected to ASUS router %s", self.host)
 
         self._connected_devices = len(wrt_devices)
         consider_home: int = self._options.get(
@@ -348,10 +344,10 @@ class AsusWrtRouter:
         """Return the device information."""
         info = DeviceInfo(
             identifiers={(DOMAIN, self.unique_id or "AsusWRT")},
-            name=self._host,
+            name=self.host,
             model=self._api.model or "Asus Router",
             manufacturer="Asus",
-            configuration_url=f"http://{self._host}",
+            configuration_url=f"http://{self.host}",
         )
         if self._api.firmware:
             info["sw_version"] = self._api.firmware
@@ -371,7 +367,7 @@ class AsusWrtRouter:
     @property
     def host(self) -> str:
         """Return router hostname."""
-        return self._host
+        return self._api.host
 
     @property
     def mac(self) -> str | None:
@@ -386,7 +382,7 @@ class AsusWrtRouter:
     @property
     def name(self) -> str:
         """Return router name."""
-        return self._host if self.unique_id else DEFAULT_NAME
+        return self.host if self.unique_id else DEFAULT_NAME
 
     @property
     def devices(self) -> dict[str, AsusWrtDevInfo]:

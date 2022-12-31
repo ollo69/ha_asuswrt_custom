@@ -78,11 +78,17 @@ class AsusWrtBridge(ABC):
             return AsusWrtHttpBridge(conf, session)
         return AsusWrtLegacyBridge(conf, options)
 
-    def __init__(self) -> None:
+    def __init__(self, host: str) -> None:
         """Initialize Bridge."""
+        self._host = host
         self._firmware: str | None = None
         self._label_mac: str | None = None
         self._model: str | None = None
+
+    @property
+    def host(self) -> str:
+        """Return hostname."""
+        return self._host
 
     @property
     def firmware(self) -> str | None:
@@ -128,7 +134,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
         self, conf: dict[str, Any], options: dict[str, Any] | None = None
     ) -> None:
         """Initialize Bridge."""
-        super().__init__()
+        super().__init__(conf[CONF_HOST])
         self._protocol: str = conf[CONF_PROTOCOL]
         self._api: AsusWrtLegacy = self._get_api(conf, options)
 
@@ -256,7 +262,11 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
             ]
         except Exception as exc:  # pylint: disable=broad-except
             _LOGGER.debug(
-                "Failed checking temperature sensor availability for ASUS router. Exception: %s",
+                (
+                    "Failed checking temperature sensor availability for ASUS router"
+                    " %s. Exception: %s"
+                ),
+                self.host,
                 exc,
             )
             return []
@@ -304,7 +314,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
 
     def __init__(self, conf: dict[str, Any], session: ClientSession) -> None:
         """Initialize Bridge that use HTTP library."""
-        super().__init__()
+        super().__init__(conf[CONF_HOST])
         self._api: AsusWrtHttp = self._get_api(conf, session)
 
     @staticmethod
@@ -417,7 +427,11 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             ]
         except AsusWrtError as exc:
             _LOGGER.debug(
-                "Failed checking temperature sensor availability for ASUS router. Exception: %s",
+                (
+                    "Failed checking temperature sensor availability for ASUS router"
+                    " %s. Exception: %s"
+                ),
+                self.host,
                 exc,
             )
             return []
