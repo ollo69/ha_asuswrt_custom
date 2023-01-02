@@ -18,7 +18,6 @@ from homeassistant.helpers.update_coordinator import (
 from .const import DATA_ASUSWRT, DOMAIN, KEY_COORDINATOR, KEY_SENSORS, SENSORS_WAN
 from .router import AsusWrtRouter
 
-
 BINARY_SENSORS: tuple[BinarySensorEntityDescription, ...] = (
     BinarySensorEntityDescription(
         key=SENSORS_WAN[0],
