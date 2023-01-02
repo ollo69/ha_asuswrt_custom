@@ -12,7 +12,9 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     DATA_GIGABYTES,
+    DATA_MEGABYTES,
     DATA_RATE_MEGABITS_PER_SECOND,
+    PERCENTAGE,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
@@ -31,8 +33,10 @@ from .const import (
     SENSORS_BYTES,
     SENSORS_CONNECTED_DEVICE,
     SENSORS_LOAD_AVG,
+    SENSORS_MEMORY,
     SENSORS_RATES,
     SENSORS_TEMPERATURES,
+    SENSORS_WAN,
 )
 from .router import AsusWrtRouter
 
@@ -42,7 +46,7 @@ class AsusWrtSensorEntityDescription(SensorEntityDescription):
     """A class that describes AsusWrt sensor entities."""
 
     factor: int | None = None
-    precision: int = 2
+    precision: int | None = 2
 
 
 UNIT_DEVICES = "Devices"
@@ -134,6 +138,71 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
         factor=1,
         precision=1,
+    ),
+    AsusWrtSensorEntityDescription(
+        key=SENSORS_MEMORY[0],
+        name="Memory Usage",
+        icon="mdi:memory",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        factor=1,
+        precision=1,
+    ),
+    AsusWrtSensorEntityDescription(
+        key=SENSORS_MEMORY[1],
+        name="Memory Total",
+        icon="mdi:memory",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=DATA_MEGABYTES,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        factor=1024,
+        precision=None,
+    ),
+    AsusWrtSensorEntityDescription(
+        key=SENSORS_MEMORY[2],
+        name="Memory Free",
+        icon="mdi:memory",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=DATA_MEGABYTES,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        factor=1024,
+        precision=None,
+    ),
+    AsusWrtSensorEntityDescription(
+        key=SENSORS_MEMORY[3],
+        name="Memory Used",
+        icon="mdi:memory",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=DATA_MEGABYTES,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        factor=1024,
+        precision=None,
+    ),
+    AsusWrtSensorEntityDescription(
+        key=SENSORS_WAN[1],
+        name="Wan Ip Address",
+        icon="mdi:web",
+        entity_category=EntityCategory.CONFIG,
+        entity_registry_enabled_default=False,
+    ),
+    AsusWrtSensorEntityDescription(
+        key=SENSORS_WAN[2],
+        name="Wan Gateway",
+        icon="mdi:web",
+        entity_category=EntityCategory.CONFIG,
+        entity_registry_enabled_default=False,
+    ),
+    AsusWrtSensorEntityDescription(
+        key=SENSORS_WAN[3],
+        name="Wan DNS",
+        icon="mdi:web",
+        entity_category=EntityCategory.CONFIG,
+        entity_registry_enabled_default=False,
     ),
 ) + TEMP_SENSORS
 

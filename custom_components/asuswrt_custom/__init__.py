@@ -8,7 +8,7 @@ from homeassistant.core import Event, HomeAssistant
 from .const import DATA_ASUSWRT, DOMAIN
 from .router import AsusWrtRouter
 
-PLATFORMS = [Platform.DEVICE_TRACKER, Platform.SENSOR]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.DEVICE_TRACKER, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

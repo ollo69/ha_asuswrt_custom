@@ -38,16 +38,22 @@ from .const import (
     PROTOCOL_TELNET,
     SENSORS_BYTES,
     SENSORS_LOAD_AVG,
+    SENSORS_MEMORY,
     SENSORS_RATES,
     SENSORS_TEMPERATURES,
     SENSORS_TEMPERATURES_LEGACY,
+    SENSORS_WAN,
 )
+
+HTTP_WAN_SENSORS = ["status", "ipaddr", "gateway", "dns"]
 
 SENSORS_TYPE_BYTES = "sensors_bytes"
 SENSORS_TYPE_COUNT = "sensors_count"
 SENSORS_TYPE_LOAD_AVG = "sensors_load_avg"
+SENSORS_TYPE_MEMORY = "sensors_memory"
 SENSORS_TYPE_RATES = "sensors_rates"
 SENSORS_TYPE_TEMPERATURES = "sensors_temperatures"
+SENSORS_TYPE_WAN = "sensors_wan"
 
 WrtDevice = namedtuple("WrtDevice", ["ip", "name", "connected_to"])
 
@@ -407,6 +413,10 @@ class AsusWrtHttpBridge(AsusWrtBridge):
                 KEY_SENSORS: SENSORS_BYTES,
                 KEY_METHOD: self._get_bytes,
             },
+            SENSORS_TYPE_MEMORY: {
+                KEY_SENSORS: SENSORS_MEMORY,
+                KEY_METHOD: self._get_memory_usage,
+            },
             SENSORS_TYPE_RATES: {
                 KEY_SENSORS: SENSORS_RATES,
                 KEY_METHOD: self._get_rates,
@@ -414,6 +424,10 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             SENSORS_TYPE_TEMPERATURES: {
                 KEY_SENSORS: sensors_temperatures,
                 KEY_METHOD: self._get_temperatures,
+            },
+            SENSORS_TYPE_WAN: {
+                KEY_SENSORS: SENSORS_WAN,
+                KEY_METHOD: self._get_wan_info,
             },
         }
         return sensors_types
@@ -463,3 +477,29 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             raise UpdateFailed(exc) from exc
 
         return temperatures
+
+    async def _get_memory_usage(self) -> dict[str, Any]:
+        """Fetch memory information from the router."""
+        try:
+            memory = await self._api.async_get_memory_usage()
+        except AsusWrtError as exc:
+            raise UpdateFailed(exc) from exc
+
+        # calculate memory usage percentage
+        try:
+            memory_perc = round((memory["mem_used"] / memory["mem_total"]) * 100, 1)
+        except Exception:  # pylint: disable=broad-except
+            memory_perc = None
+
+        memory_val = [memory_perc] + list(memory.values())
+        return _get_dict(SENSORS_MEMORY, memory_val)
+
+    async def _get_wan_info(self) -> dict[str, Any]:
+        """Fetch wan information from the router."""
+        try:
+            wan_info = await self._api.async_get_wan_info()
+        except AsusWrtError as exc:
+            raise UpdateFailed(exc) from exc
+
+        wan_sensors = [wan_info.get(v) for v in HTTP_WAN_SENSORS]
+        return _get_dict(SENSORS_WAN, wan_sensors)
