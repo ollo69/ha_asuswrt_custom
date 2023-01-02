@@ -15,13 +15,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .const import (
-    DATA_ASUSWRT,
-    DOMAIN,
-    KEY_COORDINATOR,
-    KEY_SENSORS,
-    SENSORS_WAN,
-)
+from .const import DATA_ASUSWRT, DOMAIN, KEY_COORDINATOR, KEY_SENSORS, SENSORS_WAN
 from .router import AsusWrtRouter
 
 
