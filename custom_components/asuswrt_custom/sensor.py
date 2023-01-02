@@ -148,7 +148,7 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         factor=1,
-        precision=1,
+        precision=None,
     ),
     AsusWrtSensorEntityDescription(
         key=SENSORS_MEMORY[1],
