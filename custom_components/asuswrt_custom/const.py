@@ -29,6 +29,12 @@ PROTOCOL_TELNET = "telnet"
 SENSORS_BYTES = ["sensor_rx_bytes", "sensor_tx_bytes"]
 SENSORS_CONNECTED_DEVICE = ["sensor_connected_device"]
 SENSORS_LOAD_AVG = ["sensor_load_avg1", "sensor_load_avg5", "sensor_load_avg15"]
+SENSORS_MEMORY = [
+    "sensor_memory_perc",
+    "sensor_memory_total",
+    "sensor_memory_free",
+    "sensor_memory_used",
+]
 SENSORS_RATES = ["sensor_rx_rates", "sensor_tx_rates"]
 SENSORS_TEMPERATURES = {
     "2.4GHz": "2.4GHz Temperature",
@@ -38,3 +44,9 @@ SENSORS_TEMPERATURES = {
     "6.0GHz": "6GHz Temperature",
 }
 SENSORS_TEMPERATURES_LEGACY = [[*SENSORS_TEMPERATURES][i] for i in range(3)]
+SENSORS_WAN = [
+    "sensor_wan_status",
+    "sensor_wan_ipaddr",
+    "sensor_wan_gateway",
+    "sensor_wan_dns",
+]
