@@ -1,6 +1,8 @@
 """Asuswrt binary sensors."""
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -18,13 +20,22 @@ from homeassistant.helpers.update_coordinator import (
 from .const import DATA_ASUSWRT, DOMAIN, KEY_COORDINATOR, KEY_SENSORS, SENSORS_WAN
 from .router import AsusWrtRouter
 
-BINARY_SENSORS: tuple[BinarySensorEntityDescription, ...] = (
-    BinarySensorEntityDescription(
+
+@dataclass
+class AsusWrtBinarySensorEntityDescription(BinarySensorEntityDescription):
+    """A class that describes AsusWrt binary sensor entities."""
+
+    on_value: int | str | None = None
+
+
+BINARY_SENSORS: tuple[AsusWrtBinarySensorEntityDescription, ...] = (
+    AsusWrtBinarySensorEntityDescription(
         key=SENSORS_WAN[0],
         name="Wan Status",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
+        on_value="1",
     ),
 )
 
@@ -53,15 +64,17 @@ async def async_setup_entry(
 class AsusWrtSensor(CoordinatorEntity, BinarySensorEntity):
     """Representation of a AsusWrt binary sensor."""
 
+    entity_description: AsusWrtBinarySensorEntityDescription
+
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
         router: AsusWrtRouter,
-        description: BinarySensorEntityDescription,
+        description: AsusWrtBinarySensorEntityDescription,
     ) -> None:
         """Initialize a AsusWrt sensor."""
         super().__init__(coordinator)
-        self.entity_description: BinarySensorEntityDescription = description
+        self.entity_description = description
 
         self._attr_name = f"{router.name} {description.name}"
         if router.unique_id:
@@ -79,5 +92,6 @@ class AsusWrtSensor(CoordinatorEntity, BinarySensorEntity):
         descr = self.entity_description
         state = self.coordinator.data.get(descr.key)
         if state is not None:
-            return bool(state)
+            if (on_value := descr.on_value) is not None:
+                return state == on_value
         return state

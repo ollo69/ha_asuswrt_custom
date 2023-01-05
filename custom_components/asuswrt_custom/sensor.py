@@ -148,7 +148,7 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         factor=1,
-        precision=None,
+        precision=1,
     ),
     AsusWrtSensorEntityDescription(
         key=SENSORS_MEMORY[1],
@@ -231,6 +231,8 @@ async def async_setup_entry(
 class AsusWrtSensor(CoordinatorEntity, SensorEntity):
     """Representation of a AsusWrt sensor."""
 
+    entity_description: AsusWrtSensorEntityDescription
+
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
@@ -239,7 +241,7 @@ class AsusWrtSensor(CoordinatorEntity, SensorEntity):
     ) -> None:
         """Initialize a AsusWrt sensor."""
         super().__init__(coordinator)
-        self.entity_description: AsusWrtSensorEntityDescription = description
+        self.entity_description = description
 
         self._attr_name = f"{router.name} {description.name}"
         if router.unique_id:
