@@ -70,7 +70,14 @@ MOCK_CURRENT_TRANSFER_RATES_HTTP = {
     k: v for k, v in enumerate(MOCK_CURRENT_TRANSFER_RATES)
 }
 MOCK_LOAD_AVG = [1.1, 1.2, 1.3]
+MOCK_MEMORY_USAGE = {"mem_total": 1048576, "mem_free": 355952, "mem_used": 692624}
 MOCK_TEMPERATURES = {"2.4GHz": 40, "5.0GHz": 0, "CPU": 71.2}
+MOCK_WAN_INFO = {
+    "status": "1",
+    "ipaddr": "192.168.1.50",
+    "gateway": "192.168.1.254",
+    "dns": "1.0.0.1",
+}
 MOCK_MAC_1 = "A1:B1:C1:D1:E1:F1"
 MOCK_MAC_2 = "A2:B2:C2:D2:E2:F2"
 MOCK_MAC_3 = "A3:B3:C3:D3:E3:F3"
@@ -174,6 +181,7 @@ def mock_controller_connect_legacy(mock_devices_legacy, mock_available_temps):
         service_mock.return_value.async_get_connected_devices = AsyncMock(
             return_value=mock_devices_legacy
         )
+        service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value=None)
         service_mock.return_value.async_get_bytes_total = AsyncMock(
             return_value=MOCK_BYTES_TOTAL
         )
@@ -211,6 +219,10 @@ def mock_controller_connect_http(mock_devices_http):
         service_mock.return_value.async_get_connected_devices = AsyncMock(
             return_value=mock_devices_http
         )
+        service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value=None)
+        service_mock.return_value.async_get_memory_usage = AsyncMock(
+            return_value=MOCK_MEMORY_USAGE
+        )
         service_mock.return_value.async_get_traffic_bytes = AsyncMock(
             return_value=MOCK_BYTES_TOTAL_HTTP
         )
@@ -219,6 +231,9 @@ def mock_controller_connect_http(mock_devices_http):
         )
         service_mock.return_value.async_get_temperatures = AsyncMock(
             return_value={"2.4GHz": 40, "CPU": 71.2}
+        )
+        service_mock.return_value.async_get_wan_info = AsyncMock(
+            return_value=MOCK_WAN_INFO
         )
         yield service_mock
 
@@ -234,6 +249,7 @@ def mock_controller_connect_legacy_sens_fail():
         service_mock.return_value.async_get_connected_devices = AsyncMock(
             side_effect=OSError
         )
+        service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value=None)
         service_mock.return_value.async_get_bytes_total = AsyncMock(side_effect=OSError)
         service_mock.return_value.async_get_current_transfer_rates = AsyncMock(
             side_effect=OSError
@@ -260,6 +276,10 @@ def mock_controller_connect_http_sens_fail():
         service_mock.return_value.async_get_connected_devices = AsyncMock(
             side_effect=AsusWrtError
         )
+        service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value=None)
+        service_mock.return_value.async_get_memory_usage = AsyncMock(
+            side_effect=AsusWrtError
+        )
         service_mock.return_value.async_get_traffic_bytes = AsyncMock(
             side_effect=AsusWrtError
         )
@@ -267,6 +287,9 @@ def mock_controller_connect_http_sens_fail():
             side_effect=AsusWrtError
         )
         service_mock.return_value.async_get_temperatures = AsyncMock(
+            side_effect=AsusWrtError
+        )
+        service_mock.return_value.async_get_wan_info = AsyncMock(
             side_effect=AsusWrtError
         )
         yield service_mock

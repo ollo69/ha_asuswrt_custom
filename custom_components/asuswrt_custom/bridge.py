@@ -129,6 +129,10 @@ class AsusWrtBridge(ABC):
         """Get list of connected devices."""
 
     @abstractmethod
+    async def async_get_mesh_nodes(self) -> dict[str, str] | None:
+        """Get list of mesh nodes."""
+
+    @abstractmethod
     async def async_get_available_sensors(self) -> dict[str, dict[str, Any]]:
         """Return a dictionary of available sensors for this bridge."""
 
@@ -196,6 +200,10 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
             format_mac(mac): WrtDevice(dev.ip, dev.name, None)
             for mac, dev in api_devices.items()
         }
+
+    async def async_get_mesh_nodes(self) -> dict[str, str] | None:
+        """Get list of mesh nodes."""
+        return None
 
     async def _get_nvram_info(self, info_type: str) -> dict[str, Any]:
         """Get AsusWrt router info from nvram."""
@@ -367,6 +375,16 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             format_mac(mac): WrtDevice(dev.ip, dev.name, dev.node)
             for mac, dev in api_devices.items()
         }
+
+    async def async_get_mesh_nodes(self) -> dict[str, str] | None:
+        """Get list of mesh nodes."""
+        try:
+            nodes = await self._api.async_get_mesh_nodes()
+        except AsusWrtError:
+            return None
+        if not nodes:
+            return None
+        return {format_mac(mac): ip for mac, ip in nodes.items()}
 
     async def _async_get_settings(self, info_type: str) -> dict[str, Any]:
         """Get AsusWrt router info from nvram."""
