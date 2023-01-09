@@ -8,6 +8,7 @@ CONF_SSH_KEY = "ssh_key"
 CONF_TRACK_UNKNOWN = "track_unknown"
 
 DATA_ASUSWRT = DOMAIN
+NODES_ASUSWRT = "asuswrt_nodes"
 
 DEFAULT_DNSMASQ = "/var/lib/misc"
 DEFAULT_INTERFACE = "eth0"

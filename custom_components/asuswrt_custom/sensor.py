@@ -30,6 +30,7 @@ from .const import (
     DOMAIN,
     KEY_COORDINATOR,
     KEY_SENSORS,
+    NODES_ASUSWRT,
     SENSORS_BYTES,
     SENSORS_CONNECTED_DEVICE,
     SENSORS_LOAD_AVG,
@@ -212,18 +213,24 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensors."""
     router: AsusWrtRouter = hass.data[DOMAIN][entry.entry_id][DATA_ASUSWRT]
+    nodes: AsusWrtRouter = hass.data[DOMAIN][entry.entry_id][NODES_ASUSWRT]
     entities = []
 
-    for sensor_data in router.sensors_coordinator.values():
-        coordinator = sensor_data[KEY_COORDINATOR]
-        sensors = sensor_data[KEY_SENSORS]
-        entities.extend(
-            [
-                AsusWrtSensor(coordinator, router, sensor_descr)
-                for sensor_descr in CONNECTION_SENSORS
-                if sensor_descr.key in sensors
-            ]
-        )
+    for index, node in enumerate([router, *nodes]):
+        excluded_sensors = []
+        if index > 0:
+            excluded_sensors += SENSORS_WAN
+        for sensor_data in node.sensors_coordinator.values():
+            coordinator = sensor_data[KEY_COORDINATOR]
+            sensors = sensor_data[KEY_SENSORS]
+            entities.extend(
+                [
+                    AsusWrtSensor(coordinator, node, sensor_descr)
+                    for sensor_descr in CONNECTION_SENSORS
+                    if sensor_descr.key in sensors
+                    and sensor_descr.key not in excluded_sensors
+                ]
+            )
 
     async_add_entities(entities, True)
 
