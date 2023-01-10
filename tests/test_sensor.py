@@ -65,13 +65,20 @@ MAC_ADDR = "a1:b2:c3:d4:e5:f6"
 
 MOCK_BYTES_TOTAL = [60000000000, 50000000000]
 MOCK_BYTES_TOTAL_HTTP = {k: v for k, v in enumerate(MOCK_BYTES_TOTAL)}
+MOCK_CPU_USAGE = {"cpu0_usage": 0.1, "cpu1_usage": 0.2, "cpu_total_usage": 0.1}
 MOCK_CURRENT_TRANSFER_RATES = [20000000, 10000000]
 MOCK_CURRENT_TRANSFER_RATES_HTTP = {
     k: v for k, v in enumerate(MOCK_CURRENT_TRANSFER_RATES)
 }
 MOCK_LOAD_AVG = [1.1, 1.2, 1.3]
-MOCK_MEMORY_USAGE = {"mem_total": 1048576, "mem_free": 355952, "mem_used": 692624}
+MOCK_MEMORY_USAGE = {
+    "mem_usage_perc": 52.48,
+    "mem_total": 1048576,
+    "mem_free": 355952,
+    "mem_used": 692624,
+}
 MOCK_TEMPERATURES = {"2.4GHz": 40, "5.0GHz": 0, "CPU": 71.2}
+MOCK_UPTIME = {"uptime": 123456}
 MOCK_WAN_INFO = {
     "status": "1",
     "ipaddr": "192.168.1.50",
@@ -220,6 +227,9 @@ def mock_controller_connect_http(mock_devices_http):
             return_value=mock_devices_http
         )
         service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value=None)
+        service_mock.return_value.async_get_cpu_usage = AsyncMock(
+            return_value=MOCK_CPU_USAGE
+        )
         service_mock.return_value.async_get_memory_usage = AsyncMock(
             return_value=MOCK_MEMORY_USAGE
         )
@@ -232,6 +242,7 @@ def mock_controller_connect_http(mock_devices_http):
         service_mock.return_value.async_get_temperatures = AsyncMock(
             return_value={"2.4GHz": 40, "CPU": 71.2}
         )
+        service_mock.return_value.async_get_uptime = AsyncMock(return_value=MOCK_UPTIME)
         service_mock.return_value.async_get_wan_info = AsyncMock(
             return_value=MOCK_WAN_INFO
         )
@@ -277,6 +288,9 @@ def mock_controller_connect_http_sens_fail():
             side_effect=AsusWrtError
         )
         service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value=None)
+        service_mock.return_value.async_get_cpu_usage = AsyncMock(
+            side_effect=AsusWrtError
+        )
         service_mock.return_value.async_get_memory_usage = AsyncMock(
             side_effect=AsusWrtError
         )
@@ -289,6 +303,7 @@ def mock_controller_connect_http_sens_fail():
         service_mock.return_value.async_get_temperatures = AsyncMock(
             side_effect=AsusWrtError
         )
+        service_mock.return_value.async_get_uptime = AsyncMock(side_effect=AsusWrtError)
         service_mock.return_value.async_get_wan_info = AsyncMock(
             side_effect=AsusWrtError
         )
