@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from datetime import timedelta
 import logging
 from typing import Any
 
@@ -23,6 +24,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.util.dt import utcnow
 
 from .const import (
     CONF_DNSMASQ,
@@ -37,22 +39,27 @@ from .const import (
     PROTOCOL_HTTPS,
     PROTOCOL_TELNET,
     SENSORS_BYTES,
+    SENSORS_CPU,
     SENSORS_LOAD_AVG,
     SENSORS_MEMORY,
     SENSORS_RATES,
     SENSORS_TEMPERATURES,
     SENSORS_TEMPERATURES_LEGACY,
+    SENSORS_UPTIME,
     SENSORS_WAN,
 )
 
+HTTP_UPTIME = "uptime"
 HTTP_WAN_SENSORS = ["status", "ipaddr", "gateway", "dns"]
 
 SENSORS_TYPE_BYTES = "sensors_bytes"
 SENSORS_TYPE_COUNT = "sensors_count"
+SENSORS_TYPE_CPU = "sensors_cpu"
 SENSORS_TYPE_LOAD_AVG = "sensors_load_avg"
 SENSORS_TYPE_MEMORY = "sensors_memory"
 SENSORS_TYPE_RATES = "sensors_rates"
 SENSORS_TYPE_TEMPERATURES = "sensors_temperatures"
+SENSORS_TYPE_UPTIME = "sensors_uptime"
 SENSORS_TYPE_WAN = "sensors_wan"
 
 WrtDevice = namedtuple("WrtDevice", ["ip", "name", "connected_to"])
@@ -426,10 +433,15 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     async def async_get_available_sensors(self) -> dict[str, dict[str, Any]]:
         """Return a dictionary of available sensors for this bridge."""
         sensors_temperatures = await self._get_available_temperature_sensors()
+        sensors_cpu = await self._get_available_cpu_sensors()
         sensors_types = {
             SENSORS_TYPE_BYTES: {
                 KEY_SENSORS: SENSORS_BYTES,
                 KEY_METHOD: self._get_bytes,
+            },
+            SENSORS_TYPE_CPU: {
+                KEY_SENSORS: sensors_cpu,
+                KEY_METHOD: self._get_cpu_usage,
             },
             SENSORS_TYPE_MEMORY: {
                 KEY_SENSORS: SENSORS_MEMORY,
@@ -443,12 +455,33 @@ class AsusWrtHttpBridge(AsusWrtBridge):
                 KEY_SENSORS: sensors_temperatures,
                 KEY_METHOD: self._get_temperatures,
             },
+            SENSORS_TYPE_UPTIME: {
+                KEY_SENSORS: SENSORS_UPTIME,
+                KEY_METHOD: self._get_uptime,
+            },
             SENSORS_TYPE_WAN: {
                 KEY_SENSORS: SENSORS_WAN,
                 KEY_METHOD: self._get_wan_info,
             },
         }
         return sensors_types
+
+    async def _get_available_cpu_sensors(self) -> list[str]:
+        """Check which cpu information is available on the router."""
+        try:
+            available_cpu = await self._api.async_get_cpu_usage()
+            available_sensors = [t for t in SENSORS_CPU if t in available_cpu]
+        except AsusWrtError as exc:
+            _LOGGER.debug(
+                (
+                    "Failed checking cpu sensor availability for ASUS router"
+                    " %s. Exception: %s"
+                ),
+                self.host,
+                exc,
+            )
+            return []
+        return available_sensors
 
     async def _get_available_temperature_sensors(self) -> list[str]:
         """Check which temperature information is available on the router."""
@@ -478,6 +511,31 @@ class AsusWrtHttpBridge(AsusWrtBridge):
 
         return _get_dict(SENSORS_BYTES, list(datas.values()))
 
+    async def _get_cpu_usage(self) -> dict[str, Any]:
+        """Fetch cpu information from the router."""
+        try:
+            cpu_usage: dict[str, Any] = await self._api.async_get_cpu_usage()
+        except AsusWrtError as exc:
+            raise UpdateFailed(exc) from exc
+
+        return cpu_usage
+
+    async def _get_memory_usage(self) -> dict[str, Any]:
+        """Fetch memory information from the router."""
+        try:
+            memory = await self._api.async_get_memory_usage()
+        except AsusWrtError as exc:
+            raise UpdateFailed(exc) from exc
+
+        # calculate memory usage percentage
+        try:
+            memory_perc = round((memory["mem_used"] / memory["mem_total"]) * 100, 1)
+        except Exception:  # pylint: disable=broad-except
+            memory_perc = None
+
+        memory_val = [memory_perc] + list(memory.values())
+        return _get_dict(SENSORS_MEMORY, memory_val)
+
     async def _get_rates(self) -> dict[str, Any]:
         """Fetch rates information from the router."""
         try:
@@ -496,21 +554,21 @@ class AsusWrtHttpBridge(AsusWrtBridge):
 
         return temperatures
 
-    async def _get_memory_usage(self) -> dict[str, Any]:
-        """Fetch memory information from the router."""
+    async def _get_uptime(self) -> dict[str, Any]:
+        """Fetch uptime from the router."""
         try:
-            memory = await self._api.async_get_memory_usage()
+            uptimes = await self._api.async_get_uptime()
         except AsusWrtError as exc:
             raise UpdateFailed(exc) from exc
 
-        # calculate memory usage percentage
-        try:
-            memory_perc = round((memory["mem_used"] / memory["mem_total"]) * 100, 1)
-        except Exception:  # pylint: disable=broad-except
-            memory_perc = None
+        uptime = last_boot = None
+        if HTTP_UPTIME in uptimes:
+            uptime = uptimes[HTTP_UPTIME]
+            last_boot = (utcnow() - timedelta(seconds=uptime)).replace(
+                second=0, microsecond=0
+            )
 
-        memory_val = [memory_perc] + list(memory.values())
-        return _get_dict(SENSORS_MEMORY, memory_val)
+        return _get_dict(SENSORS_UPTIME, [last_boot, uptime])
 
     async def _get_wan_info(self) -> dict[str, Any]:
         """Fetch wan information from the router."""

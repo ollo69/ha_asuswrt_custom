@@ -15,6 +15,7 @@ from homeassistant.const import (
     DATA_MEGABYTES,
     DATA_RATE_MEGABITS_PER_SECOND,
     PERCENTAGE,
+    TIME_SECONDS,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
@@ -33,10 +34,12 @@ from .const import (
     NODES_ASUSWRT,
     SENSORS_BYTES,
     SENSORS_CONNECTED_DEVICE,
+    SENSORS_CPU,
     SENSORS_LOAD_AVG,
     SENSORS_MEMORY,
     SENSORS_RATES,
     SENSORS_TEMPERATURES,
+    SENSORS_UPTIME,
     SENSORS_WAN,
 )
 from .router import AsusWrtRouter
@@ -52,6 +55,19 @@ class AsusWrtSensorEntityDescription(SensorEntityDescription):
 
 UNIT_DEVICES = "Devices"
 
+CPU_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = tuple(
+    AsusWrtSensorEntityDescription(
+        key=sens_key,
+        name=sens_name,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        factor=1,
+        precision=None,
+    )
+    for sens_key, sens_name in SENSORS_CPU.items()
+)
 TEMP_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = tuple(
     AsusWrtSensorEntityDescription(
         key=sens_key,
@@ -185,6 +201,20 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         precision=None,
     ),
     AsusWrtSensorEntityDescription(
+        key=SENSORS_UPTIME[0],
+        name="Last Boot",
+        device_class=SensorDeviceClass.TIMESTAMP,
+    ),
+    AsusWrtSensorEntityDescription(
+        key=SENSORS_UPTIME[1],
+        name="Uptime",
+        state_class=SensorStateClass.TOTAL,
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=TIME_SECONDS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+    ),
+    AsusWrtSensorEntityDescription(
         key=SENSORS_WAN[1],
         name="Wan Ip Address",
         icon="mdi:web",
@@ -205,7 +235,7 @@ CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         entity_registry_enabled_default=False,
     ),
-) + TEMP_SENSORS
+) + (CPU_SENSORS + TEMP_SENSORS)
 
 
 async def async_setup_entry(
