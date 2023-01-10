@@ -71,7 +71,12 @@ MOCK_CURRENT_TRANSFER_RATES_HTTP = {
     k: v for k, v in enumerate(MOCK_CURRENT_TRANSFER_RATES)
 }
 MOCK_LOAD_AVG = [1.1, 1.2, 1.3]
-MOCK_MEMORY_USAGE = {"mem_total": 1048576, "mem_free": 355952, "mem_used": 692624}
+MOCK_MEMORY_USAGE = {
+    "mem_usage_perc": 52.48,
+    "mem_total": 1048576,
+    "mem_free": 355952,
+    "mem_used": 692624,
+}
 MOCK_TEMPERATURES = {"2.4GHz": 40, "5.0GHz": 0, "CPU": 71.2}
 MOCK_UPTIME = {"uptime": 123456}
 MOCK_WAN_INFO = {

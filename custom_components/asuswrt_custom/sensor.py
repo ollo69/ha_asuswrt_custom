@@ -59,6 +59,7 @@ CPU_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = tuple(
     AsusWrtSensorEntityDescription(
         key=sens_key,
         name=sens_name,
+        icon="mdi:cpu-32-bit",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         entity_category=EntityCategory.DIAGNOSTIC,

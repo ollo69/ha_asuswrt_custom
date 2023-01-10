@@ -30,7 +30,7 @@ PROTOCOL_TELNET = "telnet"
 SENSORS_BYTES = ["sensor_rx_bytes", "sensor_tx_bytes"]
 SENSORS_CONNECTED_DEVICE = ["sensor_connected_device"]
 SENSORS_CPU = {
-    "cpu_total_usage": "CPU Total Usage",
+    "cpu_total_usage": "CPU Usage",
     "cpu1_usage": "CPU Core1 Usage",
     "cpu2_usage": "CPU Core2 Usage",
     "cpu3_usage": "CPU Core3 Usage",

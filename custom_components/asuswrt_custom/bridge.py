@@ -527,14 +527,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         except AsusWrtError as exc:
             raise UpdateFailed(exc) from exc
 
-        # calculate memory usage percentage
-        try:
-            memory_perc = round((memory["mem_used"] / memory["mem_total"]) * 100, 1)
-        except Exception:  # pylint: disable=broad-except
-            memory_perc = None
-
-        memory_val = [memory_perc] + list(memory.values())
-        return _get_dict(SENSORS_MEMORY, memory_val)
+        return _get_dict(SENSORS_MEMORY, list(memory.values()))
 
     async def _get_rates(self) -> dict[str, Any]:
         """Fetch rates information from the router."""
