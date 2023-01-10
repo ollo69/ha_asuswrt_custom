@@ -40,7 +40,6 @@ BINARY_SENSORS: tuple[AsusWrtBinarySensorEntityDescription, ...] = (
         key=SENSORS_WAN[0],
         name="Wan Status",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
-        entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         on_value="1",
     ),
