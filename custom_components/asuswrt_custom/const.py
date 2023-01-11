@@ -26,6 +26,9 @@ PROTOCOL_HTTPS = "https"
 PROTOCOL_SSH = "ssh"
 PROTOCOL_TELNET = "telnet"
 
+# Commands
+COMMAND_REBOOT = "cmd_reboot"
+
 # Sensors
 SENSORS_BYTES = ["sensor_rx_bytes", "sensor_tx_bytes"]
 SENSORS_CONNECTED_DEVICE = ["sensor_connected_device"]

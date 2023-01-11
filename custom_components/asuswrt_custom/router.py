@@ -16,7 +16,7 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import format_mac
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, format_mac
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_track_time_interval
@@ -396,6 +396,8 @@ class AsusWrtRouter:
         )
         if self._api.firmware:
             info["sw_version"] = self._api.firmware
+        if self.mac:
+            info["connections"] = {(CONNECTION_NETWORK_MAC, self.mac)}
 
         return info
 
@@ -438,3 +440,8 @@ class AsusWrtRouter:
     def sensors_coordinator(self) -> dict[str, Any]:
         """Return sensors coordinators."""
         return self._sensors_coordinator
+
+    @property
+    def api(self) -> AsusWrtBridge:
+        """Return router bridge api."""
+        return self._api

@@ -27,6 +27,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util.dt import utcnow
 
 from .const import (
+    COMMAND_REBOOT,
     CONF_DNSMASQ,
     CONF_INTERFACE,
     CONF_REQUIRE_IP,
@@ -117,6 +118,15 @@ class AsusWrtBridge(ABC):
     def model(self) -> str | None:
         """Return model information."""
         return self._model or None
+
+    @property
+    def supported_commands(self) -> list[str]:
+        """Return bridge supported commands."""
+        return []
+
+    async def async_reboot(self) -> bool:
+        """Reboot the device."""
+        raise NotImplementedError()
 
     @property
     @abstractmethod
@@ -349,6 +359,15 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             port=conf.get(CONF_PORT),
             session=session,
         )
+
+    @property
+    def supported_commands(self) -> list[str]:
+        """Return bridge supported commands."""
+        return [COMMAND_REBOOT]
+
+    async def async_reboot(self) -> bool:
+        """Reboot the device."""
+        return await self._api.async_reboot()
 
     @property
     def is_connected(self) -> bool:
