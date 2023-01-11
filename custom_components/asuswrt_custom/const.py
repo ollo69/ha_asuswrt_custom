@@ -27,6 +27,7 @@ PROTOCOL_SSH = "ssh"
 PROTOCOL_TELNET = "telnet"
 
 # Commands
+COMMAND_LED = "cmd_led"
 COMMAND_REBOOT = "cmd_reboot"
 
 # Sensors

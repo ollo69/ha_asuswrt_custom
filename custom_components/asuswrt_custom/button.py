@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final
 
 from homeassistant.components.button import (
     ButtonDeviceClass,
@@ -31,7 +30,7 @@ class AsusWrtButtonDescription(ButtonEntityDescription, AsusWrtButtonDescription
     """Class to describe a Button entity."""
 
 
-BUTTONS: Final = [
+BUTTONS: tuple[AsusWrtButtonDescription, ...] = (
     AsusWrtButtonDescription(
         key=COMMAND_REBOOT,
         name="Reboot",
@@ -39,7 +38,7 @@ BUTTONS: Final = [
         entity_category=EntityCategory.CONFIG,
         press_action=lambda asuswrt_api: asuswrt_api.async_reboot(),
     ),
-]
+)
 
 
 async def async_setup_entry(
