@@ -244,7 +244,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensors."""
     router: AsusWrtRouter = hass.data[DOMAIN][entry.entry_id][DATA_ASUSWRT]
-    nodes: AsusWrtRouter = hass.data[DOMAIN][entry.entry_id][NODES_ASUSWRT]
+    nodes: list[AsusWrtRouter] = hass.data[DOMAIN][entry.entry_id][NODES_ASUSWRT]
     entities = []
 
     for index, node in enumerate([router, *nodes]):
