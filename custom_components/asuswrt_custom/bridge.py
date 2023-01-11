@@ -27,6 +27,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util.dt import utcnow
 
 from .const import (
+    COMMAND_LED,
     COMMAND_REBOOT,
     CONF_DNSMASQ,
     CONF_INTERFACE,
@@ -123,6 +124,14 @@ class AsusWrtBridge(ABC):
     def supported_commands(self) -> list[str]:
         """Return bridge supported commands."""
         return []
+
+    async def async_get_led_status(self) -> bool:
+        """Get leds status."""
+        raise NotImplementedError()
+
+    async def async_set_led_status(self, status: bool) -> bool:
+        """Set leds status."""
+        raise NotImplementedError()
 
     async def async_reboot(self) -> bool:
         """Reboot the device."""
@@ -363,7 +372,18 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     @property
     def supported_commands(self) -> list[str]:
         """Return bridge supported commands."""
-        return [COMMAND_REBOOT]
+        return [COMMAND_LED, COMMAND_REBOOT]
+
+    async def async_get_led_status(self) -> bool:
+        """Get leds status."""
+        try:
+            return await self._api.async_get_led_status()
+        except AsusWrtError:
+            return None
+
+    async def async_set_led_status(self, status: bool) -> bool:
+        """Set leds status."""
+        return await self._api.async_set_led_status(status)
 
     async def async_reboot(self) -> bool:
         """Reboot the device."""

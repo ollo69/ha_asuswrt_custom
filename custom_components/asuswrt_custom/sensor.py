@@ -83,7 +83,7 @@ TEMP_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = tuple(
     )
     for sens_key, sens_name in SENSORS_TEMPERATURES.items()
 )
-CONNECTION_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
+SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
     AsusWrtSensorEntityDescription(
         key=SENSORS_CONNECTED_DEVICE[0],
         name="Devices Connected",
@@ -257,7 +257,7 @@ async def async_setup_entry(
             entities.extend(
                 [
                     AsusWrtSensor(coordinator, node, sensor_descr)
-                    for sensor_descr in CONNECTION_SENSORS
+                    for sensor_descr in SENSORS
                     if sensor_descr.key in sensors
                     and sensor_descr.key not in excluded_sensors
                 ]
