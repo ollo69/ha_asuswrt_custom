@@ -29,6 +29,7 @@ from homeassistant.util.dt import utcnow
 from .const import (
     COMMAND_LED,
     COMMAND_REBOOT,
+    COMMAND_UPDATE,
     CONF_DNSMASQ,
     CONF_INTERFACE,
     CONF_REQUIRE_IP,
@@ -135,6 +136,10 @@ class AsusWrtBridge(ABC):
 
     async def async_reboot(self) -> bool:
         """Reboot the device."""
+        raise NotImplementedError()
+
+    async def async_get_fw_update(self) -> str | None:
+        """Get available fw update."""
         raise NotImplementedError()
 
     @property
@@ -370,9 +375,14 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         )
 
     @property
+    def firmware(self) -> str | None:
+        """Return firmware information."""
+        return self._api.firmware
+
+    @property
     def supported_commands(self) -> list[str]:
         """Return bridge supported commands."""
-        return [COMMAND_LED, COMMAND_REBOOT]
+        return [COMMAND_LED, COMMAND_REBOOT, COMMAND_UPDATE]
 
     async def async_get_led_status(self) -> bool:
         """Get leds status."""
@@ -389,6 +399,10 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         """Reboot the device."""
         return await self._api.async_reboot()
 
+    async def async_get_fw_update(self) -> str | None:
+        """Get available fw update."""
+        return await self._api.async_get_new_fw()
+
     @property
     def is_connected(self) -> bool:
         """Get connected status."""
@@ -404,8 +418,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         # get main router properties
         if mac := self._api.mac:
             self._label_mac = format_mac(mac)
-        await self._get_firmware()
-        await self._get_model()
+        self._model = self._api.model
 
     async def async_disconnect(self) -> None:
         """Disconnect to the device."""
@@ -431,43 +444,6 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         if not nodes:
             return None
         return {format_mac(mac): ip for mac, ip in nodes.items()}
-
-    async def _async_get_settings(self, info_type: str) -> dict[str, Any]:
-        """Get AsusWrt router info from nvram."""
-        info = {}
-        try:
-            info = await self._api.async_get_settings(info_type)
-        except AsusWrtError as exc:
-            _LOGGER.warning(
-                "Error calling method async_get_settings(%s): %s", info_type, exc
-            )
-
-        return info
-
-    async def _get_firmware(self) -> None:
-        """Get firmware information."""
-        if self._firmware is None:
-            firmware = ""
-            firmver = await self._async_get_settings("firmver")
-            if firmver and "firmver" in firmver:
-                firmware = firmver["firmver"]
-            buildno = await self._async_get_settings("buildno")
-            if buildno and "buildno" in buildno:
-                if firmware:
-                    firmware += "."
-                firmware += buildno["buildno"]
-                if extendno := await self._async_get_settings("extendno"):
-                    if ext := extendno.get("extendno"):
-                        firmware += f"_{ext}"
-            self._firmware = firmware or "N/A"
-
-    async def _get_model(self) -> None:
-        """Get model information."""
-        if self._model is None:
-            self._model = ""
-            model = await self._async_get_settings("productid")
-            if model and "productid" in model:
-                self._model = model["productid"]
 
     async def async_get_available_sensors(self) -> dict[str, dict[str, Any]]:
         """Return a dictionary of available sensors for this bridge."""

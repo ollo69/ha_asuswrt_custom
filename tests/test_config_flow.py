@@ -106,10 +106,11 @@ class AsusWrtHttpFake:
     def __init__(self, mac_addr=None, is_connected=True, side_effect=None):
         """Initialize a fake `AsusWrtLegacy` instance."""
         self.mac = mac_addr
+        self.model = "FAKE_MODEL"
+        self.firmware = "FAKE_FIRWARE"
         self.is_connected = is_connected
         self.async_connect = AsyncMock(side_effect=side_effect)
         self.async_disconnect = AsyncMock()
-        self.async_get_settings = AsyncMock()
 
 
 def patch_asuswrt(mac_addr=None, *, is_connected=True, side_effect=None):

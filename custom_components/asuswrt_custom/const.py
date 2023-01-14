@@ -29,6 +29,7 @@ PROTOCOL_TELNET = "telnet"
 # Commands
 COMMAND_LED = "cmd_led"
 COMMAND_REBOOT = "cmd_reboot"
+COMMAND_UPDATE = "cmd_update"
 
 # Sensors
 SENSORS_BYTES = ["sensor_rx_bytes", "sensor_tx_bytes"]

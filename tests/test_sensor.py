@@ -214,15 +214,9 @@ def mock_controller_connect_http(mock_devices_http):
         service_mock.return_value.async_connect = AsyncMock()
         service_mock.return_value.is_connected = True
         service_mock.return_value.mac = MAC_ADDR
+        service_mock.return_value.model = "FAKE_MODEL"
+        service_mock.return_value.firmware = "FAKE_FIRMWARE"
         service_mock.return_value.async_disconnect = AsyncMock()
-        service_mock.return_value.async_get_settings = AsyncMock(
-            return_value={
-                "productid": "abcd",
-                "firmver": "efg",
-                "buildno": "123",
-                "extendno": "2",
-            }
-        )
         service_mock.return_value.async_get_connected_devices = AsyncMock(
             return_value=mock_devices_http
         )
@@ -280,10 +274,9 @@ def mock_controller_connect_http_sens_fail():
         service_mock.return_value.async_connect = AsyncMock()
         service_mock.return_value.is_connected = True
         service_mock.return_value.mac = None
+        service_mock.return_value.model = "FAKE_MODEL"
+        service_mock.return_value.firmware = "FAKE_FIRMWARE"
         service_mock.return_value.async_disconnect = AsyncMock()
-        service_mock.return_value.async_get_settings = AsyncMock(
-            side_effect=AsusWrtError
-        )
         service_mock.return_value.async_get_connected_devices = AsyncMock(
             side_effect=AsusWrtError
         )
