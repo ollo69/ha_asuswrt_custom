@@ -7,6 +7,8 @@
         "error": {
             "cannot_connect": "Failed to connect",
             "invalid_host": "Invalid hostname or IP address",
+            "pwd_and_ssh": "Only provide password or SSH key file",
+            "pwd_or_ssh": "Please provide password or SSH key file",
             "pwd_required": "Password is required for selected protocol",
             "ssh_not_file": "SSH key file not found",
             "unknown": "Unexpected error"
@@ -14,8 +16,7 @@
         "step": {
             "legacy": {
                 "data": {
-                    "mode": "Mode",
-                    "ssh_key": "Path to your SSH key file"
+                    "mode": "Router operating mode"
                 },
                 "description": "Set required parameters to connect to your router",
                 "title": "AsusWRT"
@@ -26,7 +27,8 @@
                     "password": "Password",
                     "port": "Port (leave empty for protocol default)",
                     "protocol": "Communication protocol to use",
-                    "username": "Username"
+                    "username": "Username",
+                    "ssh_key": "Path to your SSH key file"
                 },
                 "description": "Set required parameters to connect to your router",
                 "title": "AsusWRT"

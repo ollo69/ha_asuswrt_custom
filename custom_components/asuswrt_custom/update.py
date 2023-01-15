@@ -74,7 +74,7 @@ class AsusWrtUpdate(UpdateEntity):
         """Summary of the release notes or changelog."""
         if self._new_version:
             return (
-                f"New firmware [{self._new_version}] is available."
-                " Use router's administration page to perform update"
+                "New firmware available. Use router administration page to perform the"
+                " update."
             )
         return None
