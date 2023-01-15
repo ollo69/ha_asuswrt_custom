@@ -205,9 +205,29 @@ async def test_error_pwd_required(hass, config):
     assert result["errors"] == {CONF_BASE: "pwd_required"}
 
 
+@pytest.mark.parametrize(
+    ["config", "error"],
+    [
+        ({CONF_PASSWORD: None}, "pwd_or_ssh"),
+        ({CONF_SSH_KEY: SSH_KEY}, "pwd_and_ssh"),
+    ],
+)
+async def test_error_wrong_password_ssh(hass, config, error):
+    """Test we abort for wrong password and ssh file combination."""
+    config_data = {**CONFIG_DATA_SSH, **config}
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_USER, "show_advanced_options": True},
+        data=config_data,
+    )
+
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"base": error}
+
+
 async def test_error_invalid_ssh(hass):
     """Test we abort if invalid ssh file is provided."""
-    config_data = {**CONFIG_DATA_SSH}
+    config_data = {**CONFIG_DATA_SSH, CONF_SSH_KEY: "key"}
     config_data.pop(CONF_PASSWORD)
 
     with patch(
@@ -215,26 +235,14 @@ async def test_error_invalid_ssh(hass):
         return_value=False,
     ), PATCH_GET_HOST:
 
-        # go to legacy form
-        flow_result = await hass.config_entries.flow.async_init(
+        result = await hass.config_entries.flow.async_init(
             DOMAIN,
             context={"source": SOURCE_USER, "show_advanced_options": True},
             data=config_data,
         )
         await hass.async_block_till_done()
 
-        assert flow_result["type"] == data_entry_flow.FlowResultType.FORM
-        assert flow_result["step_id"] == "legacy"
-
-        # complete configuration
-        result = await hass.config_entries.flow.async_configure(
-            flow_result["flow_id"],
-            user_input={CONF_SSH_KEY: "key", CONF_MODE: MODE_AP},
-        )
-        await hass.async_block_till_done()
-
         assert result["type"] == data_entry_flow.FlowResultType.FORM
-        assert result["step_id"] == "legacy"
         assert result["errors"] == {CONF_BASE: "ssh_not_file"}
 
 
@@ -335,17 +343,8 @@ async def test_on_connect_legacy_failed(hass, side_effect, error):
         KEY_LEGACY
     ], PATCH_GET_HOST:
         # go to legacy form
-        legacy_result = await hass.config_entries.flow.async_configure(
-            flow_result["flow_id"], user_input=CONFIG_DATA_TELNET
-        )
-        await hass.async_block_till_done()
-
-        assert legacy_result["type"] == data_entry_flow.FlowResultType.FORM
-        assert legacy_result["step_id"] == "legacy"
-
-        # complete configuration
         result = await hass.config_entries.flow.async_configure(
-            legacy_result["flow_id"], user_input={CONF_MODE: MODE_AP}
+            flow_result["flow_id"], user_input=CONFIG_DATA_TELNET
         )
         await hass.async_block_till_done()
 
