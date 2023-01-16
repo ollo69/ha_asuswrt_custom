@@ -306,7 +306,7 @@ class AsusWrtLegacyBridge(AsusWrtBridge):
                 SENSORS_TEMPERATURES_LEGACY[i] for i in range(3) if availability[i]
             ]
         except Exception as exc:  # pylint: disable=broad-except
-            _LOGGER.debug(
+            _LOGGER.warning(
                 (
                     "Failed checking temperature sensor availability for ASUS router"
                     " %s. Exception: %s"
@@ -487,7 +487,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             available_cpu = await self._api.async_get_cpu_usage()
             available_sensors = [t for t in SENSORS_CPU if t in available_cpu]
         except AsusWrtError as exc:
-            _LOGGER.debug(
+            _LOGGER.warning(
                 (
                     "Failed checking cpu sensor availability for ASUS router"
                     " %s. Exception: %s"
@@ -506,7 +506,7 @@ class AsusWrtHttpBridge(AsusWrtBridge):
                 t for t in SENSORS_TEMPERATURES if t in available_temps
             ]
         except AsusWrtError as exc:
-            _LOGGER.debug(
+            _LOGGER.warning(
                 (
                     "Failed checking temperature sensor availability for ASUS router"
                     " %s. Exception: %s"

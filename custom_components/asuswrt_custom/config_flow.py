@@ -84,40 +84,36 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
         """Initialize the AsusWrt config flow."""
         self._config_data: dict[str, Any] = {}
         self._unique_id: str | None = None
-        self._error: str | None = None
 
     @callback
     def _show_setup_form(self, error: str | None = None) -> FlowResult:
         """Show the setup form to the user."""
 
-        base_err = error or self._error
-        self._error = None
         user_input = self._config_data
 
-        adv_schema = {}
-        conf_password = vol.Required(CONF_PASSWORD)
         if self.show_advanced_options:
-            conf_password = vol.Optional(CONF_PASSWORD)
-            adv_schema = {
+            add_schema = {
+                vol.Optional(CONF_PASSWORD): str,
+                vol.Optional(CONF_SSH_KEY): str,
                 vol.Required(
                     CONF_PROTOCOL,
                     default=user_input.get(CONF_PROTOCOL, PROTOCOL_HTTPS),
                 ): vol.In(ALLOWED_PROTOCOL),
                 vol.Optional(CONF_PORT): cv.port,
-                vol.Optional(CONF_SSH_KEY): str,
             }
+        else:
+            add_schema = {vol.Required(CONF_PASSWORD): str}
 
         schema = {
             vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
             vol.Required(CONF_USERNAME, default=user_input.get(CONF_USERNAME, "")): str,
-            conf_password: str,
-            **adv_schema,
+            **add_schema,
         }
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(schema),
-            errors={CONF_BASE: base_err} if base_err else None,
+            errors={CONF_BASE: error} if error else None,
         )
 
     @callback
@@ -187,6 +183,11 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
         if error is not None:
             return error, None, None
 
+        _LOGGER.info(
+            "Succesfully connected to the AsusWrt router at %s using protocol %s",
+            host,
+            protocol,
+        )
         unique_id = api.label_mac
         await api.async_disconnect()
 
