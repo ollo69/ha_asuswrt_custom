@@ -9,5 +9,5 @@
   "codeowners": ["@ollo69"],
   "iot_class": "local_polling",
   "loggers": ["aioasuswrt", "asyncssh", "pyasuswrt"],
-  "version": "0.6.1"
+  "version": "0.6.2"
 }
