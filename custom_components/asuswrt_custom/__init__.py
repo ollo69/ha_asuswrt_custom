@@ -5,7 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import Event, HomeAssistant
 
-from .const import DATA_ASUSWRT, DOMAIN, NODES_ASUSWRT
+from .const import DATA_ASUSWRT, DOMAIN
 from .router import AsusWrtRouter
 
 PLATFORMS = [
@@ -25,22 +25,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await router.setup()
 
     router.async_on_close(entry.add_update_listener(update_listener))
-    nodes = await router.setup_mesh_nodes()
 
     async def async_close_connection(event: Event) -> None:
         """Close AsusWrt connection on HA Stop."""
-        for node in nodes:
-            await node.close()
         await router.close()
 
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_close_connection)
     )
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        DATA_ASUSWRT: router,
-        NODES_ASUSWRT: nodes,
-    }
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {DATA_ASUSWRT: router}
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
@@ -50,9 +44,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         router = hass.data[DOMAIN][entry.entry_id][DATA_ASUSWRT]
-        nodes = hass.data[DOMAIN][entry.entry_id][NODES_ASUSWRT]
-        for node in nodes:
-            await node.close()
         await router.close()
         hass.data[DOMAIN].pop(entry.entry_id)
 

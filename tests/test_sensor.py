@@ -121,7 +121,7 @@ PATCH_SETUP_ENTRY = patch(
 def new_device(protocol, mac, ip, name):
     """Return a new device for specific protocol."""
     if protocol in [PROTOCOL_HTTP, PROTOCOL_HTTPS]:
-        return HttpDevice(mac, ip, name, MAC_ADDR, None, None)
+        return HttpDevice(mac, ip, name, MAC_ADDR, None)
     return LegacyDevice(mac, ip, name)
 
 
@@ -138,10 +138,8 @@ def mock_devices_legacy_fixture():
 def mock_devices_http_fixture():
     """Mock a list of devices."""
     return {
-        MOCK_MAC_1: HttpDevice(MOCK_MAC_1, "192.168.1.2", "Test", MAC_ADDR, None, None),
-        MOCK_MAC_2: HttpDevice(
-            MOCK_MAC_2, "192.168.1.3", "TestTwo", MAC_ADDR, None, None
-        ),
+        MOCK_MAC_1: HttpDevice(MOCK_MAC_1, "192.168.1.2", "Test", MAC_ADDR, None),
+        MOCK_MAC_2: HttpDevice(MOCK_MAC_2, "192.168.1.3", "TestTwo", MAC_ADDR, None),
     }
 
 

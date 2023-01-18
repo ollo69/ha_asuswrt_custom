@@ -176,8 +176,10 @@ class AsusWrtRouter:
         self._unique_id = entry.unique_id
 
         self._devices: dict[str, AsusWrtDevInfo] = {}
+        self._mesh_nodes: dict[str, AsusWrtRouter] = {}
         self._connected_devices: int = 0
         self._connect_error: bool = False
+        self._is_mesh_node: bool = False
 
         self._sensors_data_handler: AsusWrtSensorDataHandler | None = None
         self._sensors_coordinator: dict[str, Any] = {}
@@ -193,7 +195,7 @@ class AsusWrtRouter:
 
         if bridge:
             self._unique_id = f"{entry.unique_id}-{bridge.label_mac}"
-            self._connected_devices = -1
+            self._is_mesh_node = True
             self._api = bridge
         else:
             self._api = AsusWrtBridge.get_bridge(
@@ -202,6 +204,9 @@ class AsusWrtRouter:
 
     async def setup(self) -> None:
         """Set up a AsusWrt router."""
+        if self._is_mesh_node:
+            return
+
         await self._api.async_connect()
         if not self._api.is_connected:
             raise ConfigEntryNotReady
@@ -240,44 +245,17 @@ class AsusWrtRouter:
         # Init Sensors
         await self.init_sensors_coordinator()
 
+        # Update mesh nodes
+        await self.update_mesh_nodes()
+
         self.async_on_close(
             async_track_time_interval(self.hass, self.update_all, SCAN_INTERVAL)
         )
 
-    async def setup_mesh_nodes(self) -> list[AsusWrtRouter]:
-        """Set up AsusWrt router mesh nodes."""
-        router_list: list[AsusWrtRouter] = []
-
-        if not self.unique_id or not self._api.is_connected:
-            return router_list
-
-        if (node_list := await self._api.async_get_mesh_nodes()) is None:
-            return router_list
-
-        for node_mac, node_ip in node_list.items():
-            if node_mac == self.mac:
-                continue
-            entry_data = {**self._entry.data, CONF_HOST: node_ip}
-            bridge = AsusWrtBridge.get_bridge(self.hass, entry_data, self._options)
-            try:
-                await bridge.async_connect()
-            except ConfigEntryNotReady:
-                continue
-            if not bridge.label_mac:
-                # we need mac as unique_id
-                await bridge.async_disconnect()
-                continue
-
-            # Init Router and Sensors
-            router = AsusWrtRouter(self.hass, self._entry, bridge=bridge)
-            await router.init_sensors_coordinator()
-            router_list.append(router)
-
-        return router_list
-
     async def update_all(self, now: datetime | None = None) -> None:
         """Update all AsusWrt platforms."""
         await self.update_devices()
+        await self.update_mesh_nodes()
 
     async def update_devices(self) -> None:
         """Update AsusWrt devices tracker."""
@@ -324,6 +302,38 @@ class AsusWrtRouter:
             async_dispatcher_send(self.hass, self.signal_device_new)
         await self._update_unpolled_sensors()
 
+    async def update_mesh_nodes(self) -> None:
+        """Update AsusWrt router mesh nodes."""
+        if self._is_mesh_node or not self.unique_id or not self._api.is_connected:
+            return
+
+        new_nodes = False
+        if (node_list := await self._api.async_get_mesh_nodes()) is None:
+            return
+
+        for node_mac, node_ip in node_list.items():
+            if node_mac == self.mac or node_mac in self._mesh_nodes:
+                continue
+            entry_data = {**self._entry.data, CONF_HOST: node_ip}
+            bridge = AsusWrtBridge.get_bridge(self.hass, entry_data, self._options)
+            try:
+                await bridge.async_connect()
+            except ConfigEntryNotReady:
+                continue
+            if not bridge.label_mac:
+                # we need mac as unique_id
+                await bridge.async_disconnect()
+                continue
+
+            # Init Router and Sensors
+            router = AsusWrtRouter(self.hass, self._entry, bridge=bridge)
+            await router.init_sensors_coordinator()
+            self._mesh_nodes[node_mac] = router
+            new_nodes = True
+
+        if new_nodes:
+            async_dispatcher_send(self.hass, self.signal_node_new)
+
     async def init_sensors_coordinator(self) -> None:
         """Init AsusWrt sensors coordinators."""
         if self._sensors_data_handler:
@@ -333,7 +343,7 @@ class AsusWrtRouter:
         self._sensors_data_handler.update_device_count(self._connected_devices)
 
         sensors_types = await self._api.async_get_available_sensors()
-        if self._connected_devices >= 0:
+        if not self._is_mesh_node:
             sensors_types[SENSORS_TYPE_COUNT] = {KEY_SENSORS: SENSORS_CONNECTED_DEVICE}
 
         for sensor_type, sensor_def in sensors_types.items():
@@ -359,6 +369,8 @@ class AsusWrtRouter:
 
     async def close(self) -> None:
         """Close the connection."""
+        for dev in self._mesh_nodes.values():
+            await dev.close()
         if self._api is not None:
             await self._api.async_disconnect()
 
@@ -412,6 +424,11 @@ class AsusWrtRouter:
         return f"{DOMAIN}-device-update"
 
     @property
+    def signal_node_new(self) -> str:
+        """Event specific per AsusWrt entry to signal new mesh node."""
+        return f"{DOMAIN}-node-new"
+
+    @property
     def host(self) -> str:
         """Return router hostname."""
         return self._api.host
@@ -435,6 +452,11 @@ class AsusWrtRouter:
     def devices(self) -> dict[str, AsusWrtDevInfo]:
         """Return devices."""
         return self._devices
+
+    @property
+    def mesh_nodes(self) -> dict[str, AsusWrtRouter]:
+        """Return mesh nodes."""
+        return self._mesh_nodes
 
     @property
     def sensors_coordinator(self) -> dict[str, Any]:
