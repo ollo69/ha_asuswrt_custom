@@ -6,10 +6,11 @@ import logging
 
 from homeassistant.components.update import UpdateDeviceClass, UpdateEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import COMMAND_UPDATE, DATA_ASUSWRT, DOMAIN, NODES_ASUSWRT
+from .const import COMMAND_UPDATE, DATA_ASUSWRT, DOMAIN
 from .router import AsusWrtRouter
 
 # we check for update every 15 minutes
@@ -21,18 +22,52 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set switches for device."""
+    """Set update entity for device."""
     router: AsusWrtRouter = hass.data[DOMAIN][entry.entry_id][DATA_ASUSWRT]
-    nodes: list[AsusWrtRouter] = hass.data[DOMAIN][entry.entry_id][NODES_ASUSWRT]
+    nodes: set = set()
 
-    entities = [
-        AsusWrtUpdate(node)
-        for node in [router, *nodes]
-        if COMMAND_UPDATE in node.api.supported_commands
-        and node.api.firmware is not None
-    ]
+    router_entities = _get_entities(router)
+    async_add_entities(router_entities, True)
+
+    @callback
+    def add_nodes() -> None:
+        """Add the update entity for mesh nodes."""
+        _add_entities(router, async_add_entities, nodes)
+
+    router.async_on_close(
+        async_dispatcher_connect(hass, router.signal_node_new, add_nodes)
+    )
+
+    add_nodes()
+
+
+@callback
+def _add_entities(
+    router: AsusWrtRouter, async_add_entities: AddEntitiesCallback, nodes: set[str]
+) -> None:
+    """Add new mesh nodes entities for the router."""
+    entities = []
+
+    for mac, device in router.mesh_nodes.items():
+        if mac in nodes:
+            continue
+
+        entities.extend(_get_entities(device))
+        nodes.add(mac)
 
     async_add_entities(entities, True)
+
+
+@callback
+def _get_entities(device: AsusWrtRouter) -> list[AsusWrtUpdate]:
+    """Get entities list for device."""
+    if (
+        COMMAND_UPDATE in device.api.supported_commands
+        and device.api.firmware is not None
+    ):
+        return [AsusWrtUpdate(device)]
+
+    return []
 
 
 class AsusWrtUpdate(UpdateEntity):

@@ -18,7 +18,8 @@ from homeassistant.const import (
     TIME_SECONDS,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
@@ -31,7 +32,6 @@ from .const import (
     DOMAIN,
     KEY_COORDINATOR,
     KEY_SENSORS,
-    NODES_ASUSWRT,
     SENSORS_BYTES,
     SENSORS_CONNECTED_DEVICE,
     SENSORS_CPU,
@@ -244,26 +244,60 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensors."""
     router: AsusWrtRouter = hass.data[DOMAIN][entry.entry_id][DATA_ASUSWRT]
-    nodes: list[AsusWrtRouter] = hass.data[DOMAIN][entry.entry_id][NODES_ASUSWRT]
+    nodes: set = set()
+
+    router_entities = _get_entities(router)
+    async_add_entities(router_entities)
+
+    @callback
+    def add_nodes() -> None:
+        """Add the sensors for mesh nodes."""
+        _add_entities(router, async_add_entities, nodes)
+
+    router.async_on_close(
+        async_dispatcher_connect(hass, router.signal_node_new, add_nodes)
+    )
+
+    add_nodes()
+
+
+@callback
+def _add_entities(
+    router: AsusWrtRouter, async_add_entities: AddEntitiesCallback, nodes: set[str]
+) -> None:
+    """Add new mesh nodes entities for the router."""
     entities = []
 
-    for index, node in enumerate([router, *nodes]):
-        excluded_sensors = []
-        if index > 0:
-            excluded_sensors += SENSORS_WAN
-        for sensor_data in node.sensors_coordinator.values():
-            coordinator = sensor_data[KEY_COORDINATOR]
-            sensors = sensor_data[KEY_SENSORS]
-            entities.extend(
-                [
-                    AsusWrtSensor(coordinator, node, sensor_descr)
-                    for sensor_descr in SENSORS
-                    if sensor_descr.key in sensors
-                    and sensor_descr.key not in excluded_sensors
-                ]
-            )
+    for mac, device in router.mesh_nodes.items():
+        if mac in nodes:
+            continue
 
-    async_add_entities(entities, True)
+        entities.extend(_get_entities(device, SENSORS_WAN))
+        nodes.add(mac)
+
+    async_add_entities(entities)
+
+
+@callback
+def _get_entities(
+    device: AsusWrtRouter, excluded_sensors: list[str] | None = None
+) -> list[AsusWrtSensor]:
+    """Get entities list for device."""
+    entities = []
+
+    for sensor_data in device.sensors_coordinator.values():
+        coordinator = sensor_data[KEY_COORDINATOR]
+        sensors = sensor_data[KEY_SENSORS]
+        entities.extend(
+            [
+                AsusWrtSensor(coordinator, device, sensor_descr)
+                for sensor_descr in SENSORS
+                if sensor_descr.key in sensors
+                and sensor_descr.key not in (excluded_sensors or [])
+            ]
+        )
+
+    return entities
 
 
 class AsusWrtSensor(CoordinatorEntity, SensorEntity):

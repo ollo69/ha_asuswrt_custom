@@ -11,11 +11,12 @@ from homeassistant.components.switch import (
     SwitchEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import COMMAND_LED, DATA_ASUSWRT, DOMAIN, NODES_ASUSWRT
+from .const import COMMAND_LED, DATA_ASUSWRT, DOMAIN
 from .router import AsusWrtRouter
 
 
@@ -51,19 +52,48 @@ async def async_setup_entry(
 ) -> None:
     """Set switches for device."""
     router: AsusWrtRouter = hass.data[DOMAIN][entry.entry_id][DATA_ASUSWRT]
-    nodes: list[AsusWrtRouter] = hass.data[DOMAIN][entry.entry_id][NODES_ASUSWRT]
+    nodes: set = set()
+
+    router_entities = _get_entities(router)
+    async_add_entities(router_entities, True)
+
+    @callback
+    def add_nodes() -> None:
+        """Add the sensors for mesh nodes."""
+        _add_entities(router, async_add_entities, nodes)
+
+    router.async_on_close(
+        async_dispatcher_connect(hass, router.signal_node_new, add_nodes)
+    )
+
+    add_nodes()
+
+
+@callback
+def _add_entities(
+    router: AsusWrtRouter, async_add_entities: AddEntitiesCallback, nodes: set[str]
+) -> None:
+    """Add new mesh nodes entities for the router."""
     entities = []
 
-    for node in [router, *nodes]:
-        entities.extend(
-            [
-                AsusWrtSwitch(node, switch_descr)
-                for switch_descr in SWITCHES
-                if switch_descr.key in node.api.supported_commands
-            ]
-        )
+    for mac, device in router.mesh_nodes.items():
+        if mac in nodes:
+            continue
+
+        entities.extend(_get_entities(device))
+        nodes.add(mac)
 
     async_add_entities(entities, True)
+
+
+@callback
+def _get_entities(device: AsusWrtRouter) -> list[AsusWrtSwitch]:
+    """Get entities list for device."""
+    return [
+        AsusWrtSwitch(device, switch_descr)
+        for switch_descr in SWITCHES
+        if switch_descr.key in device.api.supported_commands
+    ]
 
 
 class AsusWrtSwitch(SwitchEntity):
