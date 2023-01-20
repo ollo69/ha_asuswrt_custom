@@ -61,10 +61,7 @@ def _add_entities(
 @callback
 def _get_entities(device: AsusWrtRouter) -> list[AsusWrtUpdate]:
     """Get entities list for device."""
-    if (
-        COMMAND_UPDATE in device.api.supported_commands
-        and device.api.firmware is not None
-    ):
+    if COMMAND_UPDATE in device.api.supported_commands:
         return [AsusWrtUpdate(device)]
 
     return []
@@ -93,6 +90,7 @@ class AsusWrtUpdate(UpdateEntity):
         """Update status with regular polling."""
         _LOGGER.debug("Checking for new available firmware")
         self._new_version = await self._asuswrt_api.async_get_fw_update()
+        self._attr_available = self._asuswrt_api.firmware is not None
 
     @property
     def installed_version(self) -> str | None:
