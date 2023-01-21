@@ -40,9 +40,10 @@ from .const import (
 
 CONF_REQ_RELOAD = [CONF_DNSMASQ, CONF_INTERFACE, CONF_REQUIRE_IP]
 DEFAULT_NAME = "Asuswrt"
+ASUS_BRAND = "Asus"
 
-SCAN_INTERVAL = timedelta(seconds=30)
 MIN_TIME_BETWEEN_NODE_SCANS = timedelta(seconds=300)
+SCAN_INTERVAL = timedelta(seconds=30)
 
 SENSORS_TYPE_COUNT = "sensors_count"
 
@@ -307,10 +308,10 @@ class AsusWrtRouter:
         if self._is_mesh_node or not self.unique_id or not self._api.is_connected:
             return
 
-        new_nodes = False
         if (node_list := await self._api.async_get_mesh_nodes()) is None:
             return
 
+        new_nodes = False
         for node_mac, node_ip in node_list.items():
             if node_mac == self.mac or node_ip is None:
                 continue
@@ -357,20 +358,26 @@ class AsusWrtRouter:
             # if we are not able to retrieve root device, we abort
             return
 
-        valid_entries = [root_dev.id]
-        all_dev_entries = dr.async_entries_for_config_entry(
+        entry_devs = dr.async_entries_for_config_entry(
             device_registry, self._entry.entry_id
         )
+        # we only take devs with single config entry, others are related to tracker
+        asus_devs = [
+            dev
+            for dev in entry_devs
+            if len(dev.config_entries) == 1 and dev.id != root_dev.id
+        ]
 
+        valid_devs = []
         for node_mac in node_list:
             if node_mac == self.mac:
                 continue
             identifier = self.get_node_unique_id(node_mac)
             if dev := device_registry.async_get_device({(DOMAIN, identifier)}):
-                valid_entries.append(dev.id)
+                valid_devs.append(dev.id)
 
-        for dev in all_dev_entries:
-            if dev.id in valid_entries:
+        for dev in asus_devs:
+            if dev.id in valid_devs:
                 continue
             _LOGGER.info("Removed orphan device node %s", dev.name)
             device_registry.async_remove_device(dev.id)
@@ -458,7 +465,7 @@ class AsusWrtRouter:
             identifiers={(DOMAIN, self.unique_id or "AsusWRT")},
             name=self.host,
             model=self._api.model or "Asus Router",
-            manufacturer="Asus",
+            manufacturer=ASUS_BRAND,
             configuration_url=f"http://{self.host}",
         )
         if self._api.firmware:
