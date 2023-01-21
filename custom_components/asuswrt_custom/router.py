@@ -15,13 +15,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, format_mac
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import dt as dt_util
+from homeassistant.util import Throttle, dt as dt_util
 
 from .bridge import AsusWrtBridge, WrtDevice
 from .const import (
@@ -43,6 +42,7 @@ CONF_REQ_RELOAD = [CONF_DNSMASQ, CONF_INTERFACE, CONF_REQUIRE_IP]
 DEFAULT_NAME = "Asuswrt"
 
 SCAN_INTERVAL = timedelta(seconds=30)
+MIN_TIME_BETWEEN_NODE_SCANS = timedelta(seconds=300)
 
 SENSORS_TYPE_COUNT = "sensors_count"
 
@@ -87,7 +87,7 @@ class AsusWrtSensorDataHandler:
         coordinator = DataUpdateCoordinator(
             self._hass,
             _LOGGER,
-            name=sensor_type,
+            name=f"{sensor_type}@{self._api.host}",
             update_method=method,
             # Polling interval. Will only be polled if there are subscribers.
             update_interval=SCAN_INTERVAL if should_poll else None,
@@ -194,7 +194,7 @@ class AsusWrtRouter:
         self._options.update(entry.options)
 
         if bridge:
-            self._unique_id = f"{entry.unique_id}-{bridge.label_mac}"
+            self._unique_id = self.get_node_unique_id(bridge.label_mac)
             self._is_mesh_node = True
             self._api = bridge
         else:
@@ -220,7 +220,7 @@ class AsusWrtRouter:
 
             if entry.domain != TRACKER_DOMAIN:
                 continue
-            device_mac = format_mac(entry.unique_id)
+            device_mac = dr.format_mac(entry.unique_id)
 
             # migrate entity unique ID if wrong formatted
             if device_mac != entry.unique_id:
@@ -312,8 +312,15 @@ class AsusWrtRouter:
             return
 
         for node_mac, node_ip in node_list.items():
-            if node_mac == self.mac or node_mac in self._mesh_nodes:
+            if node_mac == self.mac or node_ip is None:
                 continue
+            if node_mac in self._mesh_nodes:
+                node = self._mesh_nodes[node_mac]
+                # node ip for existing node is changed
+                if node.host != node_ip:
+                    await node.api.async_set_host(node_ip)
+                continue
+
             entry_data = {**self._entry.data, CONF_HOST: node_ip}
             bridge = AsusWrtBridge.get_bridge(self.hass, entry_data, self._options)
             try:
@@ -331,8 +338,48 @@ class AsusWrtRouter:
             self._mesh_nodes[node_mac] = router
             new_nodes = True
 
+        await self._async_remove_orphan_nodes(node_list)
         if new_nodes:
             async_dispatcher_send(self.hass, self.signal_node_new)
+
+    @Throttle(MIN_TIME_BETWEEN_NODE_SCANS)
+    async def _async_remove_orphan_nodes(
+        self, node_list: dict[str, str], **kwargs
+    ) -> None:
+        """Remove mesh orphan nodes from HA."""
+        _LOGGER.debug("Calling _async_remove_orphan_nodes")
+        if not self.unique_id or self._is_mesh_node:
+            return
+
+        device_registry = dr.async_get(self.hass)
+        root_dev = device_registry.async_get_device({(DOMAIN, self.unique_id)})
+        if not root_dev:
+            # if we are not able to retrieve root device, we abort
+            return
+
+        valid_entries = [root_dev.id]
+        all_dev_entries = dr.async_entries_for_config_entry(
+            device_registry, self._entry.entry_id
+        )
+
+        for node_mac in node_list:
+            if node_mac == self.mac:
+                continue
+            identifier = self.get_node_unique_id(node_mac)
+            if dev := device_registry.async_get_device({(DOMAIN, identifier)}):
+                valid_entries.append(dev.id)
+
+        for dev in all_dev_entries:
+            if dev.id in valid_entries:
+                continue
+            _LOGGER.info("Removed orphan device node %s", dev.name)
+            device_registry.async_remove_device(dev.id)
+
+        for node_mac in list(self._mesh_nodes):
+            if node_mac in node_list:
+                continue
+            node = self._mesh_nodes.pop(node_mac)
+            await node.close()
 
     async def init_sensors_coordinator(self) -> None:
         """Init AsusWrt sensors coordinators."""
@@ -396,6 +443,14 @@ class AsusWrtRouter:
         self._options.update(new_options)
         return req_reload
 
+    def get_node_unique_id(self, node_mac: str) -> str | None:
+        """Return unique id for mesh node."""
+        if not self.unique_id:
+            return None
+        if self.unique_id.endswith(node_mac):
+            return self.unique_id
+        return f"{self.unique_id}-{node_mac}"
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return the device information."""
@@ -409,7 +464,7 @@ class AsusWrtRouter:
         if self._api.firmware:
             info["sw_version"] = self._api.firmware
         if self.mac:
-            info["connections"] = {(CONNECTION_NETWORK_MAC, self.mac)}
+            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, self.mac)}
 
         return info
 
