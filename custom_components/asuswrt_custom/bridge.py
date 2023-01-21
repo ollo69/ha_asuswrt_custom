@@ -126,6 +126,10 @@ class AsusWrtBridge(ABC):
         """Return bridge supported commands."""
         return []
 
+    async def async_set_host(self, hostname: str) -> None:
+        """Set a new host name."""
+        raise NotImplementedError()
+
     async def async_get_led_status(self) -> bool:
         """Get leds status."""
         raise NotImplementedError()
@@ -383,6 +387,10 @@ class AsusWrtHttpBridge(AsusWrtBridge):
     def supported_commands(self) -> list[str]:
         """Return bridge supported commands."""
         return [COMMAND_LED, COMMAND_REBOOT, COMMAND_UPDATE]
+
+    async def async_set_host(self, hostname: str) -> None:
+        """Set a new host name."""
+        await self._api.async_set_host(hostname)
 
     async def async_get_led_status(self) -> bool:
         """Get leds status."""
