@@ -359,7 +359,7 @@ class AsusWrtRouter:
             return
 
         # we only take devs with single config entry, others are related to tracker
-        entry_id = set([self._entry.entry_id])
+        entry_id = {self._entry.entry_id}
         entry_devs = [
             device
             for device in device_registry.devices.values()
