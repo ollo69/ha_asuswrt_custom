@@ -28,7 +28,7 @@
                     "port": "Port (leave empty for protocol default)",
                     "protocol": "Communication protocol to use",
                     "username": "Username",
-                    "ssh_key": "Path to your SSH key file"
+                    "ssh_key": "Path to your SSH key file (instead of password)"
                 },
                 "description": "Set required parameters to connect to your router",
                 "title": "AsusWRT"
