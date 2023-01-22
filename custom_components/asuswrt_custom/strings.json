@@ -6,13 +6,18 @@
         "description": "Set required parameter to connect to your router",
         "data": {
           "host": "[%key:common::config_flow::data::host%]",
-          "name": "[%key:common::config_flow::data::name%]",
           "username": "[%key:common::config_flow::data::username%]",
           "password": "[%key:common::config_flow::data::password%]",
-          "ssh_key": "Path to your SSH key file (instead of password)",
           "protocol": "Communication protocol to use",
           "port": "[%key:common::config_flow::data::port%] (leave empty for protocol default)",
-          "mode": "[%key:common::config_flow::data::mode%] (only for SSH and Telnet Protocol)"
+          "ssh_key": "Path to your SSH key file (instead of password)"
+        }
+      },
+      "legacy": {
+        "title": "AsusWRT",
+        "description": "Set required parameters to connect to your router",
+        "data": {
+          "mode": "Router operating mode"
         }
       }
     },
@@ -20,7 +25,7 @@
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "invalid_host": "[%key:common::config_flow::error::invalid_host%]",
       "pwd_and_ssh": "Only provide password or SSH key file",
-      "pwd_required": "Password required for http(s) protocols",
+      "pwd_required": "Password required for selected protocols",
       "pwd_or_ssh": "Please provide password or SSH key file",
       "ssh_not_file": "SSH key file not found",
       "unknown": "[%key:common::config_flow::error::unknown%]"
