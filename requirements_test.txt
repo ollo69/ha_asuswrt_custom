@@ -2,7 +2,7 @@
 pytest==7.2.0
 #pytest-cov==2.9.0
 #pytest-homeassistant
-pytest-homeassistant-custom-component==0.12.33
+pytest-homeassistant-custom-component==0.12.42
 # From our manifest.json for our custom component
 aioasuswrt==1.4.0
 pyasuswrt==0.1.15

@@ -358,14 +358,12 @@ class AsusWrtRouter:
             # if we are not able to retrieve root device, we abort
             return
 
-        entry_devs = dr.async_entries_for_config_entry(
-            device_registry, self._entry.entry_id
-        )
         # we only take devs with single config entry, others are related to tracker
-        asus_devs = [
-            dev
-            for dev in entry_devs
-            if len(dev.config_entries) == 1 and dev.id != root_dev.id
+        entry_id = set([self._entry.entry_id])
+        entry_devs = [
+            device
+            for device in device_registry.devices.values()
+            if device.config_entries == entry_id and device.id != root_dev.id
         ]
 
         valid_devs = []
@@ -376,7 +374,7 @@ class AsusWrtRouter:
             if dev := device_registry.async_get_device({(DOMAIN, identifier)}):
                 valid_devs.append(dev.id)
 
-        for dev in asus_devs:
+        for dev in entry_devs:
             if dev.id in valid_devs:
                 continue
             _LOGGER.info("Removed orphan device node %s", dev.name)
