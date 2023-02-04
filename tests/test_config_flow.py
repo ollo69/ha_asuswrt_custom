@@ -140,7 +140,6 @@ async def test_user_legacy(hass, unique_id):
     with patch_asuswrt(unique_id)[
         KEY_LEGACY
     ], PATCH_GET_HOST, PATCH_SETUP_ENTRY as mock_setup_entry:
-
         # go to legacy form
         legacy_result = await hass.config_entries.flow.async_configure(
             flow_result["flow_id"], user_input=CONFIG_DATA_TELNET
@@ -234,7 +233,6 @@ async def test_error_invalid_ssh(hass):
         "custom_components.asuswrt_custom.config_flow.os.path.isfile",
         return_value=False,
     ), PATCH_GET_HOST:
-
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
             context={"source": SOURCE_USER, "show_advanced_options": True},
