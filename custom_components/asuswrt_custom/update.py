@@ -7,6 +7,7 @@ import logging
 from homeassistant.components.update import UpdateDeviceClass, UpdateEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -84,6 +85,7 @@ class AsusWrtUpdate(UpdateEntity):
         self._attr_device_info = router.device_info
         self._attr_device_class = UpdateDeviceClass.FIRMWARE
 
+        self._cur_version = router.api.firmware
         self._new_version: str | None = None
 
     async def async_update(self) -> None:
@@ -91,6 +93,17 @@ class AsusWrtUpdate(UpdateEntity):
         _LOGGER.debug("Checking for new available firmware")
         self._new_version = await self._asuswrt_api.async_get_fw_update()
         self._attr_available = self._asuswrt_api.firmware is not None
+        self._update_device_firmware_info()
+
+    def _update_device_firmware_info(self) -> None:
+        """Update device registry firmware information."""
+        cur_version = self._asuswrt_api.firmware
+        if cur_version is None or self._cur_version == cur_version:
+            return
+        self._cur_version = cur_version
+        device_registry = dr.async_get(self.hass)
+        if dev := device_registry.async_get_device(self.device_info["identifiers"]):
+            device_registry.async_update_device(dev.id, sw_version=cur_version)
 
     @property
     def installed_version(self) -> str | None:
