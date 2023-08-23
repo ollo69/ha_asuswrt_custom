@@ -12,7 +12,7 @@ from homeassistant.components.device_tracker.const import (
     DOMAIN as TRACKER_DOMAIN,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, Platform
+from homeassistant.const import CONF_HOST
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -21,11 +21,9 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.components.sensor import DOMAIN
-from homeassistant.util import Throttle, dt as dt_util, slugify
+from homeassistant.util import Throttle, dt as dt_util
 
 from .bridge import AsusWrtBridge, WrtDevice
-from .binary_sensor import BINARY_SENSORS
-from .button import BUTTONS
 from .const import (
     CONF_DNSMASQ,
     CONF_INTERFACE,
@@ -40,12 +38,9 @@ from .const import (
     KEY_SENSORS,
     SENSORS_CONNECTED_DEVICE,
 )
-from .sensor import SENSORS
-from .switch import SWITCHES
-from .update import COMMAND_UPDATE
+from .helper import DEFAULT_NAME, _migrate_entities_unique_id
 
 CONF_REQ_RELOAD = [CONF_DNSMASQ, CONF_INTERFACE, CONF_REQUIRE_IP]
-DEFAULT_NAME = "Asuswrt"
 ASUS_BRAND = "Asus"
 
 MIN_TIME_BETWEEN_NODE_SCANS = timedelta(seconds=300)
@@ -53,49 +48,7 @@ SCAN_INTERVAL = timedelta(seconds=30)
 
 SENSORS_TYPE_COUNT = "sensors_count"
 
-_ENTITY_MIGRATION_ID = {
-    Platform.BINARY_SENSOR: {s.key: s.name for s in BINARY_SENSORS},
-    Platform.BUTTON: {s.key: s.name for s in BUTTONS},
-    Platform.SENSOR: {s.key: s.name for s in SENSORS},
-    Platform.SWITCH: {s.key: s.name for s in SWITCHES},
-    Platform.UPDATE: {"update": COMMAND_UPDATE, "update1": "Update"},
-}
-
 _LOGGER = logging.getLogger(__name__)
-
-
-def _migrate_entities_unique_id(
-    hass: HomeAssistant, entry: ConfigEntry, router: AsusWrtRouter
-) -> None:
-    """Migrate router entities to new unique id format."""
-    entity_reg = er.async_get(hass)
-    router_entries = er.async_entries_for_config_entry(entity_reg, entry.entry_id)
-
-    old_prefix = router.unique_id
-    # in old unique id format, if entry unique id was not
-    # available was used the 'DEFAULT_NAME' instead
-    if old_prefix == entry.entry_id:
-        old_prefix = DEFAULT_NAME
-    migrate_entities: dict[str, str] = {}
-    for ent_entry in router_entries:
-        if ent_entry.domain == TRACKER_DOMAIN:
-            continue
-        old_unique_id = ent_entry.unique_id
-        if not old_unique_id.startswith(DOMAIN):
-            continue
-        if ent_entry.platform not in _ENTITY_MIGRATION_ID:
-            continue
-        for new_id, old_id in _ENTITY_MIGRATION_ID[ent_entry.platform].items():
-            if old_unique_id.endswith(f"{old_prefix} {old_id}"):
-                if ent_entry.platform == Platform.UPDATE:
-                    new_id = "update"
-                migrate_entities[ent_entry.entity_id] = slugify(
-                    f"{router.unique_id}_{new_id}"
-                )
-                break
-
-    for entity_id, unique_id in migrate_entities.items():
-        entity_reg.async_update_entity(entity_id, new_unique_id=unique_id)
 
 
 class AsusWrtSensorDataHandler:
@@ -288,7 +241,7 @@ class AsusWrtRouter:
             self._devices[device_mac] = AsusWrtDevInfo(device_mac, entry.original_name)
 
         # Migrate entities to new unique id format
-        _migrate_entities_unique_id(self.hass, self._entry, self)
+        _migrate_entities_unique_id(self.hass, self._entry, self.unique_id)
 
         # Update devices
         await self.update_devices()
@@ -387,7 +340,7 @@ class AsusWrtRouter:
             router = AsusWrtRouter(self.hass, self._entry, bridge=bridge)
 
             # Migrate entities to new unique id format
-            _migrate_entities_unique_id(self.hass, self._entry, router)
+            _migrate_entities_unique_id(self.hass, self._entry, router.unique_id)
 
             await router.init_sensors_coordinator()
             self._mesh_nodes[node_mac] = router
