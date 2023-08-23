@@ -12,7 +12,7 @@ from homeassistant.components.device_tracker.const import (
     DOMAIN as TRACKER_DOMAIN,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -20,9 +20,12 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import Throttle, dt as dt_util
+from homeassistant.components.sensor import DOMAIN
+from homeassistant.util import Throttle, dt as dt_util, slugify
 
 from .bridge import AsusWrtBridge, WrtDevice
+from .binary_sensor import BINARY_SENSORS
+from .button import BUTTONS
 from .const import (
     CONF_DNSMASQ,
     CONF_INTERFACE,
@@ -37,6 +40,9 @@ from .const import (
     KEY_SENSORS,
     SENSORS_CONNECTED_DEVICE,
 )
+from .sensor import SENSORS
+from .switch import SWITCHES
+from .update import COMMAND_UPDATE
 
 CONF_REQ_RELOAD = [CONF_DNSMASQ, CONF_INTERFACE, CONF_REQUIRE_IP]
 DEFAULT_NAME = "Asuswrt"
@@ -47,7 +53,49 @@ SCAN_INTERVAL = timedelta(seconds=30)
 
 SENSORS_TYPE_COUNT = "sensors_count"
 
+_ENTITY_MIGRATION_ID = {
+    Platform.BINARY_SENSOR: {s.key: s.name for s in BINARY_SENSORS},
+    Platform.BUTTON: {s.key: s.name for s in BUTTONS},
+    Platform.SENSOR: {s.key: s.name for s in SENSORS},
+    Platform.SWITCH: {s.key: s.name for s in SWITCHES},
+    Platform.UPDATE: {"update": COMMAND_UPDATE, "update1": "Update"},
+}
+
 _LOGGER = logging.getLogger(__name__)
+
+
+def _migrate_entities_unique_id(
+    hass: HomeAssistant, entry: ConfigEntry, router: AsusWrtRouter
+) -> None:
+    """Migrate router entities to new unique id format."""
+    entity_reg = er.async_get(hass)
+    router_entries = er.async_entries_for_config_entry(entity_reg, entry.entry_id)
+
+    old_prefix = router.unique_id
+    # in old unique id format, if entry unique id was not
+    # available was used the 'DEFAULT_NAME' instead
+    if old_prefix == entry.entry_id:
+        old_prefix = DEFAULT_NAME
+    migrate_entities: dict[str, str] = {}
+    for ent_entry in router_entries:
+        if ent_entry.domain == TRACKER_DOMAIN:
+            continue
+        old_unique_id = ent_entry.unique_id
+        if not old_unique_id.startswith(DOMAIN):
+            continue
+        if ent_entry.platform not in _ENTITY_MIGRATION_ID:
+            continue
+        for new_id, old_id in _ENTITY_MIGRATION_ID[ent_entry.platform].items():
+            if old_unique_id.endswith(f"{old_prefix} {old_id}"):
+                if ent_entry.platform == Platform.UPDATE:
+                    new_id = "update"
+                migrate_entities[ent_entry.entity_id] = slugify(
+                    f"{router.unique_id}_{new_id}"
+                )
+                break
+
+    for entity_id, unique_id in migrate_entities.items():
+        entity_reg.async_update_entity(entity_id, new_unique_id=unique_id)
 
 
 class AsusWrtSensorDataHandler:
@@ -239,6 +287,9 @@ class AsusWrtRouter:
 
             self._devices[device_mac] = AsusWrtDevInfo(device_mac, entry.original_name)
 
+        # Migrate entities to new unique id format
+        _migrate_entities_unique_id(self.hass, self._entry, self)
+
         # Update devices
         await self.update_devices()
 
@@ -304,7 +355,7 @@ class AsusWrtRouter:
 
     async def update_mesh_nodes(self) -> None:
         """Update AsusWrt router mesh nodes."""
-        if self._is_mesh_node or not self.unique_id or not self._api.is_connected:
+        if self._is_mesh_node or not self._unique_id or not self._api.is_connected:
             return
 
         if (node_list := await self._api.async_get_mesh_nodes()) is None:
@@ -332,8 +383,12 @@ class AsusWrtRouter:
                 await bridge.async_disconnect()
                 continue
 
-            # Init Router and Sensors
+            # Init Router
             router = AsusWrtRouter(self.hass, self._entry, bridge=bridge)
+
+            # Migrate entities to new unique id format
+            _migrate_entities_unique_id(self.hass, self._entry, router)
+
             await router.init_sensors_coordinator()
             self._mesh_nodes[node_mac] = router
             new_nodes = True
@@ -348,11 +403,11 @@ class AsusWrtRouter:
     ) -> None:
         """Remove mesh orphan nodes from HA."""
         _LOGGER.debug("Calling _async_remove_orphan_nodes")
-        if not self.unique_id or self._is_mesh_node:
+        if not self._unique_id or self._is_mesh_node:
             return
 
         device_registry = dr.async_get(self.hass)
-        root_dev = device_registry.async_get_device({(DOMAIN, self.unique_id)})
+        root_dev = device_registry.async_get_device({(DOMAIN, self._unique_id)})
         if not root_dev:
             # if we are not able to retrieve root device, we abort
             return
@@ -449,17 +504,17 @@ class AsusWrtRouter:
 
     def get_node_unique_id(self, node_mac: str) -> str | None:
         """Return unique id for mesh node."""
-        if not self.unique_id:
+        if not self._unique_id:
             return None
-        if self.unique_id.endswith(node_mac):
-            return self.unique_id
-        return f"{self.unique_id}-{node_mac}"
+        if self._unique_id.endswith(node_mac):
+            return self._unique_id
+        return f"{self._unique_id}-{node_mac}"
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return the device information."""
         info = DeviceInfo(
-            identifiers={(DOMAIN, self.unique_id or "AsusWRT")},
+            identifiers={(DOMAIN, self._unique_id or "AsusWRT")},
             name=self.host,
             model=self._api.model or "Asus Router",
             manufacturer=ASUS_BRAND,
@@ -498,14 +553,14 @@ class AsusWrtRouter:
         return self._api.label_mac
 
     @property
-    def unique_id(self) -> str | None:
+    def unique_id(self) -> str:
         """Return router unique id."""
-        return self._unique_id
+        return self._unique_id or self._entry.entry_id
 
     @property
     def name(self) -> str:
         """Return router name."""
-        return self.host if self.unique_id else DEFAULT_NAME
+        return self.host if self._unique_id else DEFAULT_NAME
 
     @property
     def devices(self) -> dict[str, AsusWrtDevInfo]:

@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
+from homeassistant.util import slugify
 
 from .const import DATA_ASUSWRT, DOMAIN, KEY_COORDINATOR, KEY_SENSORS, SENSORS_WAN
 from .router import AsusWrtRouter
@@ -116,10 +117,7 @@ class AsusWrtBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self.entity_description = description
 
         self._attr_name = f"{router.name} {description.name}"
-        if router.unique_id:
-            self._attr_unique_id = f"{DOMAIN} {router.unique_id} {description.name}"
-        else:
-            self._attr_unique_id = f"{DOMAIN} {self.name}"
+        self._attr_unique_id = slugify(f"{router.unique_id}_{description.key}")
         self._attr_device_info = router.device_info
         self._attr_extra_state_attributes = {"hostname": router.host}
         if mac := router.mac:

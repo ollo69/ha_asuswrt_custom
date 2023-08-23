@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import slugify
 
 from .const import COMMAND_UPDATE, DATA_ASUSWRT, DOMAIN
 from .router import AsusWrtRouter
@@ -78,10 +79,7 @@ class AsusWrtUpdate(UpdateEntity):
         self._asuswrt_api = router.api
 
         self._attr_name = f"{router.name} Update"
-        if router.unique_id:
-            self._attr_unique_id = f"{DOMAIN} {router.unique_id} {COMMAND_UPDATE}"
-        else:
-            self._attr_unique_id = f"{DOMAIN} {self.name}"
+        self._attr_unique_id = slugify(f"{router.unique_id}_update")
         self._attr_device_info = router.device_info
         self._attr_device_class = UpdateDeviceClass.FIRMWARE
 
