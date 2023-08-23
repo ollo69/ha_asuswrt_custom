@@ -105,6 +105,7 @@ class AsusWrtBinarySensor(CoordinatorEntity, BinarySensorEntity):
     """Representation of a AsusWrt binary sensor."""
 
     entity_description: AsusWrtBinarySensorEntityDescription
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -116,7 +117,6 @@ class AsusWrtBinarySensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self.entity_description = description
 
-        self._attr_name = f"{router.name} {description.name}"
         self._attr_unique_id = slugify(f"{router.unique_id}_{description.key}")
         self._attr_device_info = router.device_info
         self._attr_extra_state_attributes = {"hostname": router.host}

@@ -37,7 +37,7 @@ from .const import (
     KEY_SENSORS,
     SENSORS_CONNECTED_DEVICE,
 )
-from .helper import DEFAULT_NAME, _migrate_entities_unique_id
+from .helper import _migrate_entities_unique_id
 
 CONF_REQ_RELOAD = [CONF_DNSMASQ, CONF_INTERFACE, CONF_REQUIRE_IP]
 ASUS_BRAND = "Asus"
@@ -508,11 +508,6 @@ class AsusWrtRouter:
     def unique_id(self) -> str:
         """Return router unique id."""
         return self._unique_id or self._entry.entry_id
-
-    @property
-    def name(self) -> str:
-        """Return router name."""
-        return self.host if self._unique_id else DEFAULT_NAME
 
     @property
     def devices(self) -> dict[str, AsusWrtDevInfo]:

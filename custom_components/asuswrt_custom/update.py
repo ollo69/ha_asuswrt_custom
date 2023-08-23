@@ -73,12 +73,13 @@ class AsusWrtUpdate(UpdateEntity):
     """Defines a AsusWrt update entity."""
 
     _attr_title = "AsusWRT Firmware"
+    _attr_has_entity_name = True
+    _attr_name = "Update"
 
     def __init__(self, router: AsusWrtRouter) -> None:
         """Initialize AsusWrt update entity."""
         self._asuswrt_api = router.api
 
-        self._attr_name = f"{router.name} Update"
         self._attr_unique_id = slugify(f"{router.unique_id}_update")
         self._attr_device_info = router.device_info
         self._attr_device_class = UpdateDeviceClass.FIRMWARE

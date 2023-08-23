@@ -39,7 +39,6 @@ from custom_components.asuswrt_custom.const import (
     SENSORS_RATES,
     SENSORS_TEMPERATURES_LEGACY,
 )
-from custom_components.asuswrt_custom.helper import DEFAULT_NAME
 
 ASUSWRT_BASE = "custom_components.asuswrt_custom"
 ASUSWRT_HTTP_LIB = f"{ASUSWRT_BASE}.bridge.AsusWrtHttp"
@@ -303,8 +302,6 @@ def _setup_entry(hass, config, sensors, unique_id=None):
 
     # init variable
     obj_prefix = slugify(HOST)
-    if not unique_id:
-        obj_prefix = slugify(DEFAULT_NAME)
     sensor_prefix = f"{sensor.DOMAIN}.{obj_prefix}"
     unique_id_prefix = slugify(unique_id or config_entry.entry_id)
 
