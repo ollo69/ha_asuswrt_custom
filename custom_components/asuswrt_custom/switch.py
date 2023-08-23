@@ -101,6 +101,7 @@ class AsusWrtSwitch(SwitchEntity):
     """Defines a AsusWrt base switch."""
 
     entity_description: AsusWrtSwitchDescription
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -111,7 +112,6 @@ class AsusWrtSwitch(SwitchEntity):
         self.entity_description = description
         self._asuswrt_api = router.api
 
-        self._attr_name = f"{router.name} {description.name}"
         self._attr_unique_id = slugify(f"{router.unique_id}_{description.key}")
         self._attr_device_info = router.device_info
         self._attr_extra_state_attributes = {"hostname": router.host}
