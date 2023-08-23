@@ -20,7 +20,6 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.components.sensor import DOMAIN
 from homeassistant.util import Throttle, dt as dt_util
 
 from .bridge import AsusWrtBridge, WrtDevice
