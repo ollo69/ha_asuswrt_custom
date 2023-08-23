@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import slugify
 
 from .const import COMMAND_REBOOT, DATA_ASUSWRT, DOMAIN
 from .router import AsusWrtRouter
@@ -106,10 +107,7 @@ class AsusWrtButton(ButtonEntity):
         self._asuswrt_api = router.api
 
         self._attr_name = f"{router.name} {description.name}"
-        if router.unique_id:
-            self._attr_unique_id = f"{DOMAIN} {router.unique_id} {description.name}"
-        else:
-            self._attr_unique_id = f"{DOMAIN} {self.name}"
+        self._attr_unique_id = slugify(f"{router.unique_id}_{description.key}")
         self._attr_device_info = router.device_info
         self._attr_extra_state_attributes = {"hostname": router.host}
         if mac := router.mac:

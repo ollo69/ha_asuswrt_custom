@@ -34,8 +34,12 @@ from custom_components.asuswrt_custom.const import (
     PROTOCOL_HTTP,
     PROTOCOL_HTTPS,
     PROTOCOL_TELNET,
+    SENSORS_BYTES,
+    SENSORS_LOAD_AVG,
+    SENSORS_RATES,
+    SENSORS_TEMPERATURES_LEGACY,
 )
-from custom_components.asuswrt_custom.router import DEFAULT_NAME
+from custom_components.asuswrt_custom.helper import DEFAULT_NAME
 
 ASUSWRT_BASE = "custom_components.asuswrt_custom"
 ASUSWRT_HTTP_LIB = f"{ASUSWRT_BASE}.bridge.AsusWrtHttp"
@@ -77,7 +81,7 @@ MOCK_MEMORY_USAGE = {
     "mem_free": 355952,
     "mem_used": 692624,
 }
-MOCK_TEMPERATURES = {"2.4GHz": 40, "5.0GHz": 0, "CPU": 71.2}
+MOCK_TEMPERATURES = {"2.4GHz": 40.2, "5.0GHz": 0, "CPU": 71.2}
 MOCK_UPTIME = {"uptime": 123456}
 MOCK_WAN_INFO = {
     "status": "1",
@@ -90,27 +94,10 @@ MOCK_MAC_2 = "A2:B2:C2:D2:E2:F2"
 MOCK_MAC_3 = "A3:B3:C3:D3:E3:F3"
 MOCK_MAC_4 = "A4:B4:C4:D4:E4:F4"
 
-SENSORS_DEFAULT = [
-    "Download Speed",
-    "Download",
-    "Upload Speed",
-    "Upload",
-]
+SENSORS_DEFAULT = [*SENSORS_BYTES, *SENSORS_RATES]
 
-SENSORS_LOADAVG = [
-    "Load Avg (1m)",
-    "Load Avg (5m)",
-    "Load Avg (15m)",
-]
-
-SENSORS_TEMP = [
-    "2.4GHz Temperature",
-    "5GHz Temperature",
-    "CPU Temperature",
-]
-
-SENSORS_ALL_LEGACY = [*SENSORS_DEFAULT, *SENSORS_LOADAVG, *SENSORS_TEMP]
-SENSORS_ALL_HTTP = [*SENSORS_DEFAULT, *SENSORS_TEMP]
+SENSORS_ALL_LEGACY = [*SENSORS_DEFAULT, *SENSORS_LOAD_AVG, *SENSORS_TEMPERATURES_LEGACY]
+SENSORS_ALL_HTTP = [*SENSORS_DEFAULT, *SENSORS_TEMPERATURES_LEGACY]
 
 PATCH_SETUP_ENTRY = patch(
     f"{ASUSWRT_BASE}.async_setup_entry",
@@ -154,6 +141,7 @@ def create_device_registry_devices_fixture(hass):
     """Create device registry devices so the device tracker entities are enabled when added."""
     dev_reg = dr.async_get(hass)
     config_entry = MockConfigEntry(domain="something_else")
+    config_entry.add_to_hass(hass)
 
     for idx, device in enumerate(
         (
@@ -232,7 +220,7 @@ def mock_controller_connect_http(mock_devices_http):
             return_value=MOCK_CURRENT_TRANSFER_RATES_HTTP
         )
         service_mock.return_value.async_get_temperatures = AsyncMock(
-            return_value={"2.4GHz": 40, "CPU": 71.2}
+            return_value={"2.4GHz": 40.2, "CPU": 71.2}
         )
         service_mock.return_value.async_get_uptime = AsyncMock(return_value=MOCK_UPTIME)
         service_mock.return_value.async_get_wan_info = AsyncMock(
@@ -314,16 +302,19 @@ def _setup_entry(hass, config, sensors, unique_id=None):
     )
 
     # init variable
-    obj_prefix = slugify(HOST if unique_id else DEFAULT_NAME)
+    obj_prefix = slugify(HOST)
+    if not unique_id:
+        obj_prefix = slugify(DEFAULT_NAME)
     sensor_prefix = f"{sensor.DOMAIN}.{obj_prefix}"
+    unique_id_prefix = slugify(unique_id or config_entry.entry_id)
 
     # Pre-enable the status sensor
-    for sensor_name in sensors:
-        sensor_id = slugify(sensor_name)
+    for sensor_key in sensors:
+        sensor_id = slugify(sensor_key)
         entity_reg.async_get_or_create(
             sensor.DOMAIN,
             DOMAIN,
-            f"{DOMAIN} {unique_id or DEFAULT_NAME} {sensor_name}",
+            f"{unique_id_prefix}_{sensor_id}",
             suggested_object_id=f"{obj_prefix}_{sensor_id}",
             config_entry=config_entry,
             disabled_by=None,
@@ -369,10 +360,10 @@ async def _test_sensors(
 
     assert hass.states.get(f"{device_tracker.DOMAIN}.test").state == STATE_HOME
     assert hass.states.get(f"{device_tracker.DOMAIN}.testtwo").state == STATE_HOME
-    assert hass.states.get(f"{sensor_prefix}_download_speed").state == "160.0"
-    assert hass.states.get(f"{sensor_prefix}_download").state == "60.0"
-    assert hass.states.get(f"{sensor_prefix}_upload_speed").state == "80.0"
-    assert hass.states.get(f"{sensor_prefix}_upload").state == "50.0"
+    assert hass.states.get(f"{sensor_prefix}_sensor_rx_rates").state == "160.0"
+    assert hass.states.get(f"{sensor_prefix}_sensor_rx_bytes").state == "60.0"
+    assert hass.states.get(f"{sensor_prefix}_sensor_tx_rates").state == "80.0"
+    assert hass.states.get(f"{sensor_prefix}_sensor_tx_bytes").state == "50.0"
     assert hass.states.get(f"{sensor_prefix}_devices_connected").state == "2"
 
     # remove first tracked device
@@ -445,7 +436,7 @@ async def test_loadavg_sensors(
 ):
     """Test creating an AsusWRT load average sensors."""
     config_entry, sensor_prefix = _setup_entry(
-        hass, CONFIG_DATA_TELNET, SENSORS_LOADAVG
+        hass, CONFIG_DATA_TELNET, SENSORS_LOAD_AVG
     )
     config_entry.add_to_hass(hass)
 
@@ -456,9 +447,9 @@ async def test_loadavg_sensors(
     await hass.async_block_till_done()
 
     # assert temperature sensor available
-    assert hass.states.get(f"{sensor_prefix}_load_avg_1m").state == "1.1"
-    assert hass.states.get(f"{sensor_prefix}_load_avg_5m").state == "1.2"
-    assert hass.states.get(f"{sensor_prefix}_load_avg_15m").state == "1.3"
+    assert hass.states.get(f"{sensor_prefix}_sensor_load_avg1").state == "1.1"
+    assert hass.states.get(f"{sensor_prefix}_sensor_load_avg5").state == "1.2"
+    assert hass.states.get(f"{sensor_prefix}_sensor_load_avg15").state == "1.3"
 
 
 async def test_temperature_sensors_legacy_fail(
@@ -467,7 +458,9 @@ async def test_temperature_sensors_legacy_fail(
     mock_available_temps,
 ):
     """Test fail creating AsusWRT temperature sensors."""
-    config_entry, sensor_prefix = _setup_entry(hass, CONFIG_DATA_TELNET, SENSORS_TEMP)
+    config_entry, sensor_prefix = _setup_entry(
+        hass, CONFIG_DATA_TELNET, SENSORS_TEMPERATURES_LEGACY
+    )
     config_entry.add_to_hass(hass)
 
     # Only length of 3 booleans is valid. Checking the exception handling.
@@ -478,9 +471,9 @@ async def test_temperature_sensors_legacy_fail(
     await hass.async_block_till_done()
 
     # assert temperature availability exception is handled correctly
-    assert not hass.states.get(f"{sensor_prefix}_2_4ghz_temperature")
-    assert not hass.states.get(f"{sensor_prefix}_5ghz_temperature")
-    assert not hass.states.get(f"{sensor_prefix}_cpu_temperature")
+    assert not hass.states.get(f"{sensor_prefix}_2_4ghz")
+    assert not hass.states.get(f"{sensor_prefix}_5_0ghz")
+    assert not hass.states.get(f"{sensor_prefix}_cpu")
 
 
 async def test_temperature_sensors_http_fail(
@@ -488,7 +481,9 @@ async def test_temperature_sensors_http_fail(
     connect_http_sens_fail,
 ):
     """Test fail creating AsusWRT temperature sensors."""
-    config_entry, sensor_prefix = _setup_entry(hass, CONFIG_DATA_HTTP, SENSORS_TEMP)
+    config_entry, sensor_prefix = _setup_entry(
+        hass, CONFIG_DATA_HTTP, SENSORS_TEMPERATURES_LEGACY
+    )
     config_entry.add_to_hass(hass)
 
     # initial devices setup
@@ -496,14 +491,16 @@ async def test_temperature_sensors_http_fail(
     await hass.async_block_till_done()
 
     # assert temperature availability exception is handled correctly
-    assert not hass.states.get(f"{sensor_prefix}_2_4ghz_temperature")
-    assert not hass.states.get(f"{sensor_prefix}_5ghz_temperature")
-    assert not hass.states.get(f"{sensor_prefix}_cpu_temperature")
+    assert not hass.states.get(f"{sensor_prefix}_2_4ghz")
+    assert not hass.states.get(f"{sensor_prefix}_5_0ghz")
+    assert not hass.states.get(f"{sensor_prefix}_cpu")
 
 
 async def _test_temperature_sensors(hass, config):
     """Test creating a AsusWRT temperature sensors."""
-    config_entry, sensor_prefix = _setup_entry(hass, config, SENSORS_TEMP)
+    config_entry, sensor_prefix = _setup_entry(
+        hass, config, SENSORS_TEMPERATURES_LEGACY
+    )
     config_entry.add_to_hass(hass)
 
     # initial devices setup
@@ -513,9 +510,9 @@ async def _test_temperature_sensors(hass, config):
     await hass.async_block_till_done()
 
     # assert temperature sensor available
-    assert hass.states.get(f"{sensor_prefix}_2_4ghz_temperature").state == "40.0"
-    assert not hass.states.get(f"{sensor_prefix}_5ghz_temperature")
-    assert hass.states.get(f"{sensor_prefix}_cpu_temperature").state == "71.2"
+    assert hass.states.get(f"{sensor_prefix}_2_4ghz").state == "40.2"
+    assert not hass.states.get(f"{sensor_prefix}_5_0ghz")
+    assert hass.states.get(f"{sensor_prefix}_cpu").state == "71.2"
 
 
 async def test_temperature_sensors_legacy(

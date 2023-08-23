@@ -37,9 +37,9 @@ from .const import (
     KEY_SENSORS,
     SENSORS_CONNECTED_DEVICE,
 )
+from .helper import DEFAULT_NAME, _migrate_entities_unique_id
 
 CONF_REQ_RELOAD = [CONF_DNSMASQ, CONF_INTERFACE, CONF_REQUIRE_IP]
-DEFAULT_NAME = "Asuswrt"
 ASUS_BRAND = "Asus"
 
 MIN_TIME_BETWEEN_NODE_SCANS = timedelta(seconds=300)
@@ -239,6 +239,9 @@ class AsusWrtRouter:
 
             self._devices[device_mac] = AsusWrtDevInfo(device_mac, entry.original_name)
 
+        # Migrate entities to new unique id format
+        _migrate_entities_unique_id(self.hass, self._entry, self.unique_id)
+
         # Update devices
         await self.update_devices()
 
@@ -304,7 +307,7 @@ class AsusWrtRouter:
 
     async def update_mesh_nodes(self) -> None:
         """Update AsusWrt router mesh nodes."""
-        if self._is_mesh_node or not self.unique_id or not self._api.is_connected:
+        if self._is_mesh_node or not self._unique_id or not self._api.is_connected:
             return
 
         if (node_list := await self._api.async_get_mesh_nodes()) is None:
@@ -332,8 +335,12 @@ class AsusWrtRouter:
                 await bridge.async_disconnect()
                 continue
 
-            # Init Router and Sensors
+            # Init Router
             router = AsusWrtRouter(self.hass, self._entry, bridge=bridge)
+
+            # Migrate entities to new unique id format
+            _migrate_entities_unique_id(self.hass, self._entry, router.unique_id)
+
             await router.init_sensors_coordinator()
             self._mesh_nodes[node_mac] = router
             new_nodes = True
@@ -348,11 +355,11 @@ class AsusWrtRouter:
     ) -> None:
         """Remove mesh orphan nodes from HA."""
         _LOGGER.debug("Calling _async_remove_orphan_nodes")
-        if not self.unique_id or self._is_mesh_node:
+        if not self._unique_id or self._is_mesh_node:
             return
 
         device_registry = dr.async_get(self.hass)
-        root_dev = device_registry.async_get_device({(DOMAIN, self.unique_id)})
+        root_dev = device_registry.async_get_device({(DOMAIN, self._unique_id)})
         if not root_dev:
             # if we are not able to retrieve root device, we abort
             return
@@ -449,17 +456,17 @@ class AsusWrtRouter:
 
     def get_node_unique_id(self, node_mac: str) -> str | None:
         """Return unique id for mesh node."""
-        if not self.unique_id:
+        if not self._unique_id:
             return None
-        if self.unique_id.endswith(node_mac):
-            return self.unique_id
-        return f"{self.unique_id}-{node_mac}"
+        if self._unique_id.endswith(node_mac):
+            return self._unique_id
+        return f"{self._unique_id}-{node_mac}"
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return the device information."""
         info = DeviceInfo(
-            identifiers={(DOMAIN, self.unique_id or "AsusWRT")},
+            identifiers={(DOMAIN, self._unique_id or "AsusWRT")},
             name=self.host,
             model=self._api.model or "Asus Router",
             manufacturer=ASUS_BRAND,
@@ -498,14 +505,14 @@ class AsusWrtRouter:
         return self._api.label_mac
 
     @property
-    def unique_id(self) -> str | None:
+    def unique_id(self) -> str:
         """Return router unique id."""
-        return self._unique_id
+        return self._unique_id or self._entry.entry_id
 
     @property
     def name(self) -> str:
         """Return router name."""
-        return self.host if self.unique_id else DEFAULT_NAME
+        return self.host if self._unique_id else DEFAULT_NAME
 
     @property
     def devices(self) -> dict[str, AsusWrtDevInfo]:
