@@ -175,6 +175,7 @@ class AsusWrtRouter:
         self.hass = hass
         self._entry = entry
         self._unique_id = entry.unique_id
+        self._root_node_id = None
 
         self._devices: dict[str, AsusWrtDevInfo] = {}
         self._mesh_nodes: dict[str, AsusWrtRouter] = {}
@@ -195,6 +196,7 @@ class AsusWrtRouter:
         self._options.update(entry.options)
 
         if bridge:
+            self._root_node_id = self._unique_id
             self._unique_id = self.get_node_unique_id(bridge.label_mac)
             self._is_mesh_node = True
             self._api = bridge
@@ -476,6 +478,8 @@ class AsusWrtRouter:
             info["sw_version"] = self._api.firmware
         if self.mac:
             info["connections"] = {(dr.CONNECTION_NETWORK_MAC, self.mac)}
+        if self._root_node_id:
+            info["via_device"] = (DOMAIN, self._root_node_id)
 
         return info
 
