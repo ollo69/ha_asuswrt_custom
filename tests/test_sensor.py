@@ -73,7 +73,8 @@ MOCK_CURRENT_TRANSFER_RATES = [20000000, 10000000]
 MOCK_CURRENT_TRANSFER_RATES_HTTP = {
     k: v for k, v in enumerate(MOCK_CURRENT_TRANSFER_RATES)
 }
-MOCK_LOAD_AVG = [1.1, 1.2, 1.3]
+MOCK_LOAD_AVG_HTTP = {"load_avg_1": 1.1, "load_avg_5": 1.2, "load_avg_15": 1.3}
+MOCK_LOAD_AVG = list(MOCK_LOAD_AVG_HTTP.values())
 MOCK_MEMORY_USAGE = {
     "mem_usage_perc": 52.48,
     "mem_total": 1048576,
@@ -209,6 +210,9 @@ def mock_controller_connect_http(mock_devices_http):
         service_mock.return_value.async_get_cpu_usage = AsyncMock(
             return_value=MOCK_CPU_USAGE
         )
+        service_mock.return_value.async_get_loadavg = AsyncMock(
+            return_value=MOCK_LOAD_AVG_HTTP
+        )
         service_mock.return_value.async_get_memory_usage = AsyncMock(
             return_value=MOCK_MEMORY_USAGE
         )
@@ -267,6 +271,9 @@ def mock_controller_connect_http_sens_fail():
         )
         service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value=None)
         service_mock.return_value.async_get_cpu_usage = AsyncMock(
+            side_effect=AsusWrtError
+        )
+        service_mock.return_value.async_get_loadavg = AsyncMock(
             side_effect=AsusWrtError
         )
         service_mock.return_value.async_get_memory_usage = AsyncMock(

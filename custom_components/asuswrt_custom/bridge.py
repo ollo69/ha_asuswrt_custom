@@ -466,6 +466,10 @@ class AsusWrtHttpBridge(AsusWrtBridge):
                 KEY_SENSORS: sensors_cpu,
                 KEY_METHOD: self._get_cpu_usage,
             },
+            SENSORS_TYPE_LOAD_AVG: {
+                KEY_SENSORS: SENSORS_LOAD_AVG,
+                KEY_METHOD: self._get_load_avg,
+            },
             SENSORS_TYPE_MEMORY: {
                 KEY_SENSORS: SENSORS_MEMORY,
                 KEY_METHOD: self._get_memory_usage,
@@ -551,6 +555,15 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             raise UpdateFailed(exc) from exc
 
         return _get_dict(SENSORS_MEMORY, list(memory.values()))
+
+    async def _get_load_avg(self) -> dict[str, Any]:
+        """Fetch cpu load avg information from the router."""
+        try:
+            load_avg = await self._api.async_get_loadavg()
+        except AsusWrtError as exc:
+            raise UpdateFailed(exc) from exc
+
+        return _get_dict(SENSORS_LOAD_AVG, list(load_avg.values()))
 
     async def _get_rates(self) -> dict[str, Any]:
         """Fetch rates information from the router."""
