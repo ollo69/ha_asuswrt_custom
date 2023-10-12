@@ -46,6 +46,7 @@ MIN_TIME_BETWEEN_NODE_SCANS = timedelta(seconds=300)
 SCAN_INTERVAL = timedelta(seconds=30)
 
 SENSORS_TYPE_COUNT = "sensors_count"
+STALE_MAX_COUNT = 3
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -179,6 +180,7 @@ class AsusWrtRouter:
 
         self._devices: dict[str, AsusWrtDevInfo] = {}
         self._mesh_nodes: dict[str, AsusWrtRouter] = {}
+        self._stale_nodes: dict[str, int] = {}
         self._connected_devices: int = 0
         self._connect_error: bool = False
         self._is_mesh_node: bool = False
@@ -374,7 +376,7 @@ class AsusWrtRouter:
             if device.config_entries == entry_id and device.id != root_dev.id
         ]
 
-        valid_devs = []
+        valid_devs: list[str] = []
         for node_mac in node_list:
             if node_mac == self.mac:
                 continue
@@ -382,15 +384,25 @@ class AsusWrtRouter:
             if dev := device_registry.async_get_device({(DOMAIN, identifier)}):
                 valid_devs.append(dev.id)
 
+        removed_devs: list[set[tuple[str, str]]] = []
         for dev in entry_devs:
+            stale_count = self._stale_nodes.pop(dev.id, 0)
             if dev.id in valid_devs:
                 continue
-            _LOGGER.info("Removed orphan device node %s", dev.name)
-            device_registry.async_remove_device(dev.id)
-
-        for node_mac in list(self._mesh_nodes):
-            if node_mac in node_list:
+            if stale_count < STALE_MAX_COUNT:
+                self._stale_nodes[dev.id] = stale_count + 1
                 continue
+
+            removed_devs.append(dev.identifiers)
+            device_registry.async_remove_device(dev.id)
+            _LOGGER.info("Removed orphan mesh device node %s", dev.name)
+
+        nodes_to_remove: list[str] = []
+        for node_mac, node in self._mesh_nodes.items():
+            if {(DOMAIN, node.unique_id)} in removed_devs:
+                nodes_to_remove.append(node_mac)
+
+        for node_mac in nodes_to_remove:
             node = self._mesh_nodes.pop(node_mac)
             await node.close()
 
