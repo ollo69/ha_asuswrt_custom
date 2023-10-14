@@ -326,6 +326,7 @@ class AsusWrtRouter:
                 # node ip for existing node is changed
                 if node.host != node_ip:
                     await node.api.async_set_host(node_ip)
+                    self._async_update_device_name(node)
                 continue
 
             entry_data = {**self._entry.data, CONF_HOST: node_ip}
@@ -341,7 +342,8 @@ class AsusWrtRouter:
 
             # Init Router
             router = AsusWrtRouter(self.hass, self._entry, bridge=bridge)
-
+            # Remove associated track entity if it was previously created
+            self._async_remove_track_entity(node_mac)
             # Migrate entities to new unique id format
             _migrate_entities_unique_id(self.hass, self._entry, router.unique_id)
 
@@ -353,6 +355,20 @@ class AsusWrtRouter:
         if new_nodes:
             async_dispatcher_send(self.hass, self.signal_node_new)
 
+    @callback
+    def _async_remove_track_entity(self, mac: str) -> None:
+        """Remove specific tracked entities."""
+        entity_reg = er.async_get(self.hass)
+        if entity_id := entity_reg.async_get_entity_id(TRACKER_DOMAIN, DOMAIN, mac):
+            entity_reg.async_remove(entity_id)
+
+    @callback
+    def _async_update_device_name(self, node: AsusWrtRouter) -> None:
+        """Update device name associated to mesh node."""
+        device_registry = dr.async_get(self.hass)
+        if dev := device_registry.async_get_device({(DOMAIN, node.unique_id)}):
+            device_registry.async_update_device(dev.id, name=node.host)
+
     @Throttle(MIN_TIME_BETWEEN_NODE_SCANS)
     async def _async_remove_orphan_nodes(
         self, node_list: dict[str, str], **kwargs
@@ -363,48 +379,28 @@ class AsusWrtRouter:
             return
 
         device_registry = dr.async_get(self.hass)
-        root_dev = device_registry.async_get_device({(DOMAIN, self._unique_id)})
-        if not root_dev:
-            # if we are not able to retrieve root device, we abort
-            return
 
-        # we only take devs with single config entry, others are related to tracker
-        entry_id = {self._entry.entry_id}
-        entry_devs = [
-            device
-            for device in device_registry.devices.values()
-            if device.config_entries == entry_id and device.id != root_dev.id
-        ]
-
-        valid_devs: list[str] = []
-        for node_mac in node_list:
-            if node_mac == self.mac:
-                continue
-            identifier = self.get_node_unique_id(node_mac)
-            if dev := device_registry.async_get_device({(DOMAIN, identifier)}):
-                valid_devs.append(dev.id)
-
-        removed_devs: list[set[tuple[str, str]]] = []
-        for dev in entry_devs:
-            stale_count = self._stale_nodes.pop(dev.id, 0)
-            if dev.id in valid_devs:
-                continue
-            if stale_count < STALE_MAX_COUNT:
-                self._stale_nodes[dev.id] = stale_count + 1
-                continue
-
-            removed_devs.append(dev.identifiers)
-            device_registry.async_remove_device(dev.id)
-            _LOGGER.info("Removed orphan mesh device node %s", dev.name)
-
-        nodes_to_remove: list[str] = []
+        node_to_delete = {}
         for node_mac, node in self._mesh_nodes.items():
-            if {(DOMAIN, node.unique_id)} in removed_devs:
-                nodes_to_remove.append(node_mac)
+            if node_mac in node_list:
+                if node_mac in self._stale_nodes:
+                    self._stale_nodes.pop(node_mac)
+                continue
+            node_to_delete[node_mac] = device_registry.async_get_device(
+                {(DOMAIN, node.unique_id)}
+            )
 
-        for node_mac in nodes_to_remove:
+        for node_mac, node_dev in node_to_delete.items():
+            stale_count = self._stale_nodes.pop(node_mac, 0)
+            if node_dev is not None:
+                if stale_count < STALE_MAX_COUNT:
+                    self._stale_nodes[node_mac] = stale_count + 1
+                    continue
+                device_registry.async_remove_device(node_dev.id)
+
             node = self._mesh_nodes.pop(node_mac)
             await node.close()
+            _LOGGER.debug("Removed orphan mesh device node %s", node.host)
 
     async def init_sensors_coordinator(self) -> None:
         """Init AsusWrt sensors coordinators."""

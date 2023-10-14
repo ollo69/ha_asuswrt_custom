@@ -449,8 +449,6 @@ class AsusWrtHttpBridge(AsusWrtBridge):
             nodes = await self._api.async_get_mesh_nodes()
         except AsusWrtError:
             return None
-        if not nodes:
-            return None
         return {format_mac(mac): ip for mac, ip in nodes.items()}
 
     async def async_get_available_sensors(self) -> dict[str, dict[str, Any]]:
