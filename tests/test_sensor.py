@@ -206,7 +206,7 @@ def mock_controller_connect_http(mock_devices_http):
         service_mock.return_value.async_get_connected_devices = AsyncMock(
             return_value=mock_devices_http
         )
-        service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value=None)
+        service_mock.return_value.async_get_mesh_nodes = AsyncMock(return_value={})
         service_mock.return_value.async_get_cpu_usage = AsyncMock(
             return_value=MOCK_CPU_USAGE
         )
