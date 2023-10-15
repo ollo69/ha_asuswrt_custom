@@ -358,6 +358,8 @@ class AsusWrtRouter:
     @callback
     def _async_remove_track_entity(self, mac: str) -> None:
         """Remove specific tracked entities."""
+        if mac in self._devices:
+            self._devices.pop(mac)
         entity_reg = er.async_get(self.hass)
         if entity_id := entity_reg.async_get_entity_id(TRACKER_DOMAIN, DOMAIN, mac):
             entity_reg.async_remove(entity_id)
