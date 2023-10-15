@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/ollo69/ha_asuswrt_custom/issues",
   "loggers": ["aioasuswrt", "asyncssh", "pyasuswrt"],
   "requirements": ["aioasuswrt==1.4.0", "pyasuswrt==0.1.19"],
-  "version": "0.8.2"
+  "version": "0.8.3"
 }
