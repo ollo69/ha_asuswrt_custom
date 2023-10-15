@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from datetime import timedelta
+from datetime import datetime
 import logging
 from typing import Any
 
@@ -24,7 +24,6 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import UpdateFailed
-from homeassistant.util.dt import utcnow
 
 from .const import (
     COMMAND_LED,
@@ -52,7 +51,6 @@ from .const import (
     SENSORS_WAN,
 )
 
-HTTP_UPTIME = "uptime"
 HTTP_WAN_SENSORS = ["status", "ipaddr", "gateway", "dns"]
 
 SENSORS_TYPE_BYTES = "sensors_bytes"
@@ -588,12 +586,8 @@ class AsusWrtHttpBridge(AsusWrtBridge):
         except AsusWrtError as exc:
             raise UpdateFailed(exc) from exc
 
-        uptime = last_boot = None
-        if HTTP_UPTIME in uptimes:
-            uptime = uptimes[HTTP_UPTIME]
-            last_boot = (utcnow() - timedelta(seconds=uptime)).replace(
-                second=0, microsecond=0
-            )
+        last_boot = datetime.fromisoformat(uptimes["last_boot"])
+        uptime = uptimes["uptime"]
 
         return _get_dict(SENSORS_UPTIME, [last_boot, uptime])
 

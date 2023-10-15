@@ -82,7 +82,7 @@ MOCK_MEMORY_USAGE = {
     "mem_used": 692624,
 }
 MOCK_TEMPERATURES = {"2.4GHz": 40.2, "5.0GHz": 0, "CPU": 71.2}
-MOCK_UPTIME = {"uptime": 123456}
+MOCK_UPTIME = {"last_boot": "2023-10-14T17:24:47+00:00", "uptime": 375001}
 MOCK_WAN_INFO = {
     "status": "1",
     "ipaddr": "192.168.1.50",
