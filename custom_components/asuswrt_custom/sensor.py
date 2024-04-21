@@ -1,4 +1,5 @@
 """Asuswrt status sensors."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -45,6 +46,27 @@ from .const import (
 from .router import AsusWrtRouter
 
 
+SENSORS_CPU_DEF = {
+    SENSORS_CPU[0]: "CPU Usage",
+    SENSORS_CPU[1]: "CPU Core1 Usage",
+    SENSORS_CPU[2]: "CPU Core2 Usage",
+    SENSORS_CPU[3]: "CPU Core3 Usage",
+    SENSORS_CPU[4]: "CPU Core4 Usage",
+    SENSORS_CPU[5]: "CPU Core5 Usage",
+    SENSORS_CPU[6]: "CPU Core6 Usage",
+    SENSORS_CPU[7]: "CPU Core7 Usage",
+    SENSORS_CPU[8]: "CPU Core8 Usage",
+}
+
+SENSORS_TEMPERATURES_DEF = {
+    SENSORS_TEMPERATURES[0]: "2.4GHz Temperature",
+    SENSORS_TEMPERATURES[1]: "5GHz Temperature",
+    SENSORS_TEMPERATURES[2]: "CPU Temperature",
+    SENSORS_TEMPERATURES[3]: "5GHz Temperature 2",
+    SENSORS_TEMPERATURES[4]: "6GHz Temperature",
+}
+
+
 @dataclass
 class AsusWrtSensorEntityDescription(SensorEntityDescription):
     """A class that describes AsusWrt sensor entities."""
@@ -67,7 +89,7 @@ CPU_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = tuple(
         factor=1,
         precision=None,
     )
-    for sens_key, sens_name in SENSORS_CPU.items()
+    for sens_key, sens_name in SENSORS_CPU_DEF.items()
 )
 TEMP_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = tuple(
     AsusWrtSensorEntityDescription(
@@ -81,7 +103,7 @@ TEMP_SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = tuple(
         factor=1,
         precision=1,
     )
-    for sens_key, sens_name in SENSORS_TEMPERATURES.items()
+    for sens_key, sens_name in SENSORS_TEMPERATURES_DEF.items()
 )
 SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
     AsusWrtSensorEntityDescription(
@@ -171,18 +193,6 @@ SENSORS: tuple[AsusWrtSensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
         factor=1,
         precision=1,
-    ),
-    AsusWrtSensorEntityDescription(
-        key=SENSORS_MEMORY[1],
-        name="Memory Total",
-        icon="mdi:memory",
-        state_class=SensorStateClass.MEASUREMENT,
-        device_class=SensorDeviceClass.DATA_SIZE,
-        native_unit_of_measurement=UnitOfInformation.MEGABYTES,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        factor=1024,
-        precision=None,
     ),
     AsusWrtSensorEntityDescription(
         key=SENSORS_MEMORY[2],

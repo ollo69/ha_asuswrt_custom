@@ -1,4 +1,5 @@
 """Tests for the AsusWrt config flow."""
+
 from socket import gaierror
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -206,10 +207,7 @@ async def test_error_pwd_required(hass, config):
 
 @pytest.mark.parametrize(
     ["config", "error"],
-    [
-        ({CONF_PASSWORD: None}, "pwd_or_ssh"),
-        ({CONF_SSH_KEY: SSH_KEY}, "pwd_and_ssh"),
-    ],
+    [({CONF_PASSWORD: None}, "pwd_or_ssh")],
 )
 async def test_error_wrong_password_ssh(hass, config, error):
     """Test we abort for wrong password and ssh file combination."""

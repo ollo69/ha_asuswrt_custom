@@ -1,4 +1,5 @@
 """AsusWrt component constants."""
+
 DOMAIN = "asuswrt_custom"
 
 CONF_DNSMASQ = "dnsmasq"
@@ -33,17 +34,17 @@ COMMAND_UPDATE = "cmd_update"
 # Sensors
 SENSORS_BYTES = ["sensor_rx_bytes", "sensor_tx_bytes"]
 SENSORS_CONNECTED_DEVICE = ["sensor_connected_device"]
-SENSORS_CPU = {
-    "cpu_total_usage": "CPU Usage",
-    "cpu1_usage": "CPU Core1 Usage",
-    "cpu2_usage": "CPU Core2 Usage",
-    "cpu3_usage": "CPU Core3 Usage",
-    "cpu4_usage": "CPU Core4 Usage",
-    "cpu5_usage": "CPU Core5 Usage",
-    "cpu6_usage": "CPU Core6 Usage",
-    "cpu7_usage": "CPU Core7 Usage",
-    "cpu8_usage": "CPU Core8 Usage",
-}
+SENSORS_CPU = [
+    "cpu_total_usage",
+    "cpu1_usage",
+    "cpu2_usage",
+    "cpu3_usage",
+    "cpu4_usage",
+    "cpu5_usage",
+    "cpu6_usage",
+    "cpu7_usage",
+    "cpu8_usage",
+]
 SENSORS_LOAD_AVG = ["sensor_load_avg1", "sensor_load_avg5", "sensor_load_avg15"]
 SENSORS_MEMORY = [
     "sensor_memory_perc",
@@ -52,14 +53,8 @@ SENSORS_MEMORY = [
     "sensor_memory_used",
 ]
 SENSORS_RATES = ["sensor_rx_rates", "sensor_tx_rates"]
-SENSORS_TEMPERATURES = {
-    "2.4GHz": "2.4GHz Temperature",
-    "5.0GHz": "5GHz Temperature",
-    "CPU": "CPU Temperature",
-    "5.0GHz_2": "5GHz Temperature 2",
-    "6.0GHz": "6GHz Temperature",
-}
-SENSORS_TEMPERATURES_LEGACY = [[*SENSORS_TEMPERATURES][i] for i in range(3)]
+SENSORS_TEMPERATURES_LEGACY = ["2.4GHz", "5.0GHz", "CPU"]
+SENSORS_TEMPERATURES = [*SENSORS_TEMPERATURES_LEGACY, "5.0GHz_2", "6.0GHz"]
 SENSORS_UPTIME = ["sensor_last_boot", "sensor_uptime"]
 SENSORS_WAN = [
     "sensor_wan_status",

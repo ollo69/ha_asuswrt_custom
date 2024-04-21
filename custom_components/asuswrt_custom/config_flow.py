@@ -7,6 +7,7 @@ import os
 import socket
 from typing import Any, cast
 
+from pyasuswrt import AsusWrtError
 import voluptuous as vol
 
 from homeassistant.components.device_tracker.const import (
@@ -25,7 +26,6 @@ from homeassistant.const import (
 )
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.schema_config_entry_flow import (
     SchemaCommonFlowHandler,
@@ -54,10 +54,13 @@ from .const import (
 
 ALLOWED_PROTOCOL = {
     PROTOCOL_HTTPS: "HTTPS",
-    PROTOCOL_HTTP: "HTTP",
     PROTOCOL_SSH: "SSH",
+    PROTOCOL_HTTP: "HTTP",
     PROTOCOL_TELNET: "Telnet",
 }
+
+PASS_KEY = "pass_key"
+PASS_KEY_MSG = "Only provide password or SSH key file"
 
 RESULT_CONN_ERROR = "cannot_connect"
 RESULT_SUCCESS = "success"
@@ -133,7 +136,6 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
     def __init__(self):
         """Initialize the AsusWrt config flow."""
         self._config_data: dict[str, Any] = {}
-        self._unique_id: str | None = None
 
     @callback
     def _show_setup_form(self, error: str | None = None) -> FlowResult:
@@ -143,13 +145,9 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
 
         if self.show_advanced_options:
             add_schema = {
-                vol.Optional(CONF_PASSWORD): str,
-                vol.Required(
-                    CONF_PROTOCOL,
-                    default=user_input.get(CONF_PROTOCOL, PROTOCOL_HTTPS),
-                ): vol.In(ALLOWED_PROTOCOL),
+                vol.Exclusive(CONF_PASSWORD, PASS_KEY, PASS_KEY_MSG): str,
                 vol.Optional(CONF_PORT): cv.port,
-                vol.Optional(CONF_SSH_KEY): str,
+                vol.Exclusive(CONF_SSH_KEY, PASS_KEY, PASS_KEY_MSG): str,
             }
         else:
             add_schema = {vol.Required(CONF_PASSWORD): str}
@@ -158,6 +156,10 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
             vol.Required(CONF_USERNAME, default=user_input.get(CONF_USERNAME, "")): str,
             **add_schema,
+            vol.Required(
+                CONF_PROTOCOL,
+                default=user_input.get(CONF_PROTOCOL, PROTOCOL_HTTPS),
+            ): vol.In(ALLOWED_PROTOCOL),
         }
 
         return self.async_show_form(
@@ -168,25 +170,37 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def _async_check_connection(
         self, user_input: dict[str, Any]
-    ) -> tuple[str, str | None, str | None]:
+    ) -> tuple[str, str | None]:
         """Attempt to connect the AsusWrt router."""
 
+        api: AsusWrtBridge
         host: str = user_input[CONF_HOST]
+        protocol = user_input[CONF_PROTOCOL]
         error: str | None = None
-        valid_protocol: str | None = None
-        api: AsusWrtBridge | None = None
-        if CONF_PROTOCOL in user_input:
-            protocols: list[str] = [user_input[CONF_PROTOCOL]]
-        else:
-            protocols = list(ALLOWED_PROTOCOL)
 
-        for protocol in protocols:
-            conf = {**user_input, CONF_PROTOCOL: protocol, CONF_MODE: MODE_ROUTER}
-            api = AsusWrtBridge.get_bridge(self.hass, conf)
-            try:
-                await api.async_connect()
+        conf = {**user_input, CONF_MODE: MODE_ROUTER}
+        api = AsusWrtBridge.get_bridge(self.hass, conf)
+        try:
+            await api.async_connect()
 
-            except ConfigEntryNotReady:
+        except (AsusWrtError, OSError):
+            _LOGGER.error(
+                "Error connecting to the AsusWrt router at %s using protocol %s",
+                host,
+                protocol,
+            )
+            error = RESULT_CONN_ERROR
+
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception(
+                "Unknown error connecting with AsusWrt router at %s using protocol %s",
+                host,
+                protocol,
+            )
+            error = RESULT_UNKNOWN
+
+        if error is None:
+            if not api.is_connected:
                 _LOGGER.error(
                     "Error connecting to the AsusWrt router at %s using protocol %s",
                     host,
@@ -194,42 +208,18 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
                 )
                 error = RESULT_CONN_ERROR
 
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception(
-                    "Unknown error connecting with AsusWrt router at %s using protocol %s",
-                    host,
-                    protocol,
-                )
-                if error is None:
-                    error = RESULT_UNKNOWN
-
-            else:
-                valid_protocol = protocol
-                error = None
-
-            if error is None:
-                if not api.is_connected:
-                    _LOGGER.error(
-                        "Error connecting to the AsusWrt router at %s using protocol %s",
-                        host,
-                        protocol,
-                    )
-                    error = RESULT_CONN_ERROR
-                else:
-                    break
-
         if error is not None:
-            return error, None, None
+            return error, None
 
-        _LOGGER.info(
-            "Succesfully connected to the AsusWrt router at %s using protocol %s",
+        _LOGGER.debug(
+            "Successfully connected to the AsusWrt router at %s using protocol %s",
             host,
             protocol,
         )
         unique_id = api.label_mac
         await api.async_disconnect()
 
-        return RESULT_SUCCESS, unique_id, valid_protocol
+        return RESULT_SUCCESS, unique_id
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -244,32 +234,35 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self._show_setup_form()
 
-        protocol: str = user_input.get(CONF_PROTOCOL, "")
-        if protocol != PROTOCOL_SSH and CONF_SSH_KEY in user_input:
-            user_input.pop(CONF_SSH_KEY)
-
         self._config_data = user_input
         pwd: str | None = user_input.get(CONF_PASSWORD)
         ssh: str | None = user_input.get(CONF_SSH_KEY)
+        protocol: str = user_input[CONF_PROTOCOL]
 
         if not pwd and protocol != PROTOCOL_SSH:
             return self._show_setup_form(error="pwd_required")
         if not (pwd or ssh):
             return self._show_setup_form(error="pwd_or_ssh")
-        if pwd and ssh:
-            return self._show_setup_form(error="pwd_and_ssh")
-        if ssh:
-            if not await self.hass.async_add_executor_job(_is_file, ssh):
-                return self._show_setup_form(error="ssh_not_file")
+        if ssh and not await self.hass.async_add_executor_job(_is_file, ssh):
+            return self._show_setup_form(error="ssh_not_file")
 
         host: str = user_input[CONF_HOST]
         if not await self.hass.async_add_executor_job(_get_ip, host):
             return self._show_setup_form(error="invalid_host")
 
-        result, unique_id, protocol = await self._async_check_connection(user_input)
+        result, unique_id = await self._async_check_connection(user_input)
         if result == RESULT_SUCCESS:
-            self._unique_id = unique_id
-            self._config_data = {**user_input, CONF_PROTOCOL: protocol}
+            if unique_id:
+                await self.async_set_unique_id(unique_id)
+            # we allow to configure a single instance without unique id
+            elif self._async_current_entries():
+                return self.async_abort(reason="invalid_unique_id")
+            else:
+                _LOGGER.warning(
+                    "This device does not provide a valid Unique ID."
+                    " Configuration of multiple instance will not be possible"
+                )
+
             if protocol in [PROTOCOL_SSH, PROTOCOL_TELNET]:
                 return await self.async_step_legacy()
             return await self._async_save_entry()
@@ -288,17 +281,6 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def _async_save_entry(self) -> FlowResult:
         """Save entry data if unique id is valid."""
-        if self._unique_id:
-            await self.async_set_unique_id(self._unique_id)
-        # we allow to configure a single instance without unique id
-        elif self._async_current_entries():
-            return self.async_abort(reason="invalid_unique_id")
-        else:
-            _LOGGER.warning(
-                "This device does not provide a valid Unique ID."
-                " Configuration of multiple instance will not be possible"
-            )
-
         return self.async_create_entry(
             title=self._config_data[CONF_HOST],
             data=self._config_data,

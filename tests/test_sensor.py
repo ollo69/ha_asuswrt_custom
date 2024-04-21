@@ -1,9 +1,11 @@
 """Tests for the AsusWrt sensor."""
+
 from datetime import timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
 from aioasuswrt.asuswrt import Device as LegacyDevice
-from pyasuswrt.asuswrt import AsusWrtError, Device as HttpDevice
+from pyasuswrt.asuswrt import Device as HttpDevice
+from pyasuswrt.exceptions import AsusWrtError, AsusWrtNotAvailableInfoError
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -456,28 +458,25 @@ async def test_loadavg_sensors(
     assert hass.states.get(f"{sensor_prefix}_sensor_load_avg15").state == "1.3"
 
 
-async def test_temperature_sensors_legacy_fail(
-    hass,
-    connect_legacy,
-    mock_available_temps,
-):
-    """Test fail creating AsusWRT temperature sensors."""
-    config_entry, sensor_prefix = _setup_entry(
-        hass, CONFIG_DATA_TELNET, SENSORS_TEMPERATURES_LEGACY
-    )
+async def test_loadavg_sensors_unaivalable_http(hass, connect_http) -> None:
+    """Test load average sensors no available using http."""
+    config_entry, sensor_prefix = _setup_entry(hass, CONFIG_DATA_HTTP, SENSORS_LOAD_AVG)
     config_entry.add_to_hass(hass)
 
-    # Only length of 3 booleans is valid. Checking the exception handling.
-    mock_available_temps.pop(2)
+    connect_http.return_value.async_get_loadavg.side_effect = (
+        AsusWrtNotAvailableInfoError
+    )
 
     # initial devices setup
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
+    async_fire_time_changed(hass, utcnow() + timedelta(seconds=30))
+    await hass.async_block_till_done()
 
-    # assert temperature availability exception is handled correctly
-    assert not hass.states.get(f"{sensor_prefix}_2_4ghz")
-    assert not hass.states.get(f"{sensor_prefix}_5_0ghz")
-    assert not hass.states.get(f"{sensor_prefix}_cpu")
+    # assert load average sensors not available
+    assert not hass.states.get(f"{sensor_prefix}_sensor_load_avg1")
+    assert not hass.states.get(f"{sensor_prefix}_sensor_load_avg5")
+    assert not hass.states.get(f"{sensor_prefix}_sensor_load_avg15")
 
 
 async def test_temperature_sensors_http_fail(
