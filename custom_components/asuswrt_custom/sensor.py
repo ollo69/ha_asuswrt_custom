@@ -45,7 +45,6 @@ from .const import (
 )
 from .router import AsusWrtRouter
 
-
 SENSORS_CPU_DEF = {
     SENSORS_CPU[0]: "CPU Usage",
     SENSORS_CPU[1]: "CPU Core1 Usage",
