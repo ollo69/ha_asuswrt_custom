@@ -308,6 +308,7 @@ def _setup_entry(hass, config, sensors, unique_id=None):
         options={CONF_CONSIDER_HOME: 60},
         unique_id=unique_id,
     )
+    config_entry.add_to_hass(hass)
 
     # init variable
     obj_prefix = slugify(HOST)
@@ -355,8 +356,6 @@ async def _test_sensors(
             config_entry=config_entry,
             disabled_by=None,
         )
-
-    config_entry.add_to_hass(hass)
 
     # initial devices setup
     assert await hass.config_entries.async_setup(config_entry.entry_id)
@@ -444,7 +443,6 @@ async def test_loadavg_sensors(
     config_entry, sensor_prefix = _setup_entry(
         hass, CONFIG_DATA_TELNET, SENSORS_LOAD_AVG
     )
-    config_entry.add_to_hass(hass)
 
     # initial devices setup
     assert await hass.config_entries.async_setup(config_entry.entry_id)
@@ -461,7 +459,6 @@ async def test_loadavg_sensors(
 async def test_loadavg_sensors_unaivalable_http(hass, connect_http) -> None:
     """Test load average sensors no available using http."""
     config_entry, sensor_prefix = _setup_entry(hass, CONFIG_DATA_HTTP, SENSORS_LOAD_AVG)
-    config_entry.add_to_hass(hass)
 
     connect_http.return_value.async_get_loadavg.side_effect = (
         AsusWrtNotAvailableInfoError
@@ -487,7 +484,6 @@ async def test_temperature_sensors_http_fail(
     config_entry, sensor_prefix = _setup_entry(
         hass, CONFIG_DATA_HTTP, SENSORS_TEMPERATURES_LEGACY
     )
-    config_entry.add_to_hass(hass)
 
     # initial devices setup
     assert await hass.config_entries.async_setup(config_entry.entry_id)
@@ -504,7 +500,6 @@ async def _test_temperature_sensors(hass, config):
     config_entry, sensor_prefix = _setup_entry(
         hass, config, SENSORS_TEMPERATURES_LEGACY
     )
-    config_entry.add_to_hass(hass)
 
     # initial devices setup
     assert await hass.config_entries.async_setup(config_entry.entry_id)
@@ -590,7 +585,6 @@ async def test_connect_fail_http(hass, side_effect):
 async def _test_sensors_polling_fails(hass, config, sensors):
     """Test AsusWRT sensors are unavailable when polling fails."""
     config_entry, sensor_prefix = _setup_entry(hass, config, sensors)
-    config_entry.add_to_hass(hass)
 
     # initial devices setup
     assert await hass.config_entries.async_setup(config_entry.entry_id)
